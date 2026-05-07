@@ -35,10 +35,11 @@
             animation: blink 0.5s infinite alternate;
         }
 
+        /* --- 항공기 격추 메시지 CSS 수정 (WEP 그림자 효과와 동일하게) --- */
         #kill-msg {
-            position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
-            color: #ff0000; font-size: 2.5rem; font-weight: bold; display: none;
-            text-shadow: 0 0 10px #ffffff, 0 0 20px #000000; z-index: 20;
+            position: absolute; top: 25%; left: 50%; transform: translateX(-50%);
+            color: #ff0000; font-size: 1.5rem; font-weight: bold; display: none;
+            text-shadow: 0 0 15px rgba(255, 0, 0, 0.8); z-index: 20;
         }
 
         #distance-hud { position: absolute; top: 20px; right: 20px; z-index: 10; color: #000; font-size: 0.9rem; font-weight: bold; background: rgba(255, 255, 255, 0.6); padding: 5px 10px; border-radius: 5px; }
@@ -50,9 +51,14 @@
         button:hover { background: #7c8792; color: #fff; transform: scale(1.05); }
 
         #settings-panel { display: none; background: rgba(255, 255, 255, 0.1); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); margin-top: 20px; }
-        #help-panel { display: none; background: rgba(255, 255, 255, 0.1); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); margin-top: 20px; text-align: left; max-width: 500px; }
-        #help-panel ul { line-height: 1.8; font-size: 1.1rem; padding-left: 20px; }
-        
+        #help-panel { display: none; background: rgba(0, 20, 30, 0.95); padding: 30px; border-radius: 20px; border: 1px solid rgba(0, 255, 255, 0.3); margin-top: 20px; text-align: left; width: 600px; max-height: 80vh; overflow-y: auto; }
+        #help-panel h2 { color: #00ffff; border-bottom: 2px solid #00ffff; padding-bottom: 10px; }
+        .help-page { display: none; }
+        .help-page.active { display: block; }
+        #help-panel ul { line-height: 1.8; font-size: 1.05rem; padding-left: 20px; }
+        .help-nav { display: flex; justify-content: space-between; margin-top: 20px; }
+        .nav-btn { padding: 8px 20px; font-size: 0.9rem; background: #00ffff; color: #000; }
+
         .setting-item { display: flex; align-items: center; justify-content: space-between; width: 250px; margin-bottom: 15px; font-size: 1.1rem; }
         
         #game-over { display: none; background: rgba(150, 0, 0, 0.4); backdrop-filter: blur(10px); }
@@ -69,11 +75,275 @@
             z-index: 5;
             text-shadow: 1px 1px 2px #000000;
         }
+
+        /* --- 레이더 CSS 시작 --- */
+        #radar-ui {
+            position: absolute;
+            top: 50%;
+            right: 30px;
+            transform: translateY(-50%);
+            width: 250px; 
+            height: 250px; 
+            background: rgba(0, 30, 30, 0.6);
+            border: 2px solid #00ffff;
+            z-index: 10;
+            overflow: hidden;
+            display: none;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+            pointer-events: auto; 
+        }
+        .radar-header-text {
+            position: absolute;
+            top: 5px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+            z-index: 5;
+            pointer-events: none;
+        }
+        #radar-text-left { left: 8px; }
+        #radar-text-center { left: 50%; transform: translateX(-50%); }
+        #radar-text-right { right: 8px; }
+        
+        .radar-grid {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.2) 1px, transparent 1px);
+            background-size: 25% 25%;
+        }
+        #radar-sweep {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #00ffff;
+            box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            z-index: 2;
+            pointer-events: none;
+        }
+        #radar-blips {
+            position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 3; pointer-events: none;
+        }
+        .radar-blip {
+            position: absolute;
+            width: 10px; 
+            height: 10px;
+            background: #00ffff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px #00ffff;
+            cursor: pointer;
+        }
+
+        /* --- 부드러운 타겟박스 애니메이션 --- */
+        @keyframes lockEngage {
+            0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        /* --- 레이더 타겟 박스 CSS (완전한 정사각형으로 수정) --- */
+        #radar-target-box {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            border: 4px solid #00ffff;
+            box-sizing: border-box;
+            transform: translate(-50%, -50%);
+            display: none;
+            pointer-events: none;
+            z-index: 5;
+        }
+        #radar-target-dist {
+            position: absolute;
+            top: -20px;
+            left: 45px;
+            color: #00ffff;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        #radar-target-rel-speed {
+            position: absolute;
+            top: 0px;
+            left: 45px;
+            color: #00ffff;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        #radar-target-dir-container {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        #radar-target-dir {
+            color: #00ffff;
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px #00ffff;
+            font-weight: bold;
+        }
+        
+        /* --- 추적 추천 박스 (TWS Soft Lock) CSS --- */
+        #recommend-box {
+            position: absolute;
+            width: 48px; 
+            height: 48px; 
+            transform: translate(-50%, -50%);
+            display: none;
+            pointer-events: none;
+            z-index: 4; 
+            background: 
+                linear-gradient(to right, #00ffff 4px, transparent 4px) 0 0,
+                linear-gradient(to bottom, #00ffff 4px, transparent 4px) 0 0,
+                linear-gradient(to left, #00ffff 4px, transparent 4px) 100% 0,
+                linear-gradient(to bottom, #00ffff 4px, transparent 4px) 100% 0,
+                linear-gradient(to right, #00ffff 4px, transparent 4px) 0 100%,
+                linear-gradient(to top, #00ffff 4px, transparent 4px) 0 100%,
+                linear-gradient(to left, #00ffff 4px, transparent 4px) 100% 100%,
+                linear-gradient(to top, #00ffff 4px, transparent 4px) 100% 100%;
+            background-repeat: no-repeat;
+            background-size: 12px 12px;
+        }
+        #rec-dist {
+            position: absolute;
+            top: -20px;
+            left: 45px;
+            color: #00ffff;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        #rec-rel-speed {
+            position: absolute;
+            top: 0px;
+            left: 45px;
+            color: #00ffff;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        #rec-dir-container {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        #rec-dir {
+            color: #00ffff;
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px #00ffff;
+            font-weight: bold;
+        }
+        /* --- 레이더 CSS 끝 --- */
+
+        /* --- ACM 모드 타겟 박스 CSS 수정 --- */
+        #acm-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 48px; 
+            height: 48px; 
+            transform: translate(-50%, -50%);
+            display: none;
+            pointer-events: none;
+            z-index: 5;
+            animation: blink 0.15s infinite alternate; 
+            background: 
+                linear-gradient(to right, #00ffff 4px, transparent 4px) 0 0,
+                linear-gradient(to bottom, #00ffff 4px, transparent 4px) 0 0,
+                linear-gradient(to left, #00ffff 4px, transparent 4px) 100% 0,
+                linear-gradient(to bottom, #00ffff 4px, transparent 4px) 100% 0,
+                linear-gradient(to right, #00ffff 4px, transparent 4px) 0 100%,
+                linear-gradient(to top, #00ffff 4px, transparent 4px) 0 100%,
+                linear-gradient(to left, #00ffff 4px, transparent 4px) 100% 100%,
+                linear-gradient(to top, #00ffff 4px, transparent 4px) 100% 100%;
+            background-repeat: no-repeat;
+            background-size: 12px 12px; 
+        }
+
+        /* --- 무장 선택창 CSS 수정 --- */
+        #weapon-selector {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 0;
+            z-index: 50;
+        }
+        .weapon-box {
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            background: rgba(0, 0, 0, 0.5);
+            transition: 0.2s;
+        }
+        
+        .missile-icon {
+            position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer;
+        }
+        .missile-body { width: 14px; height: 14px; border-radius: 50%; background: #ccc; position: absolute; z-index: 2; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5); pointer-events: none; }
+        .missile-fin-h { width: 32px; height: 3px; background: #888; position: absolute; z-index: 1; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); pointer-events: none; }
+        .missile-fin-v { width: 3px; height: 32px; background: #888; position: absolute; z-index: 1; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); pointer-events: none; }
+        
+        .aim9x-style .missile-body { background: #eee; width: 12px; height: 12px; }
+        .aim9x-style .missile-fin-h { width: 24px; height: 2px; background: #aaa; }
+        .aim9x-style .missile-fin-v { width: 2px; height: 24px; background: #aaa; }
+        
+        .aim120-style .missile-body { background: #bbb; width: 16px; height: 16px; }
+        .aim120-style .missile-fin-h { width: 40px; height: 4px; background: #777; }
+        .aim120-style .missile-fin-v { width: 4px; height: 40px; background: #777; }
+        
+        .weapon-box.selected { border-color: #00ffff; background: rgba(0, 255, 255, 0.2); box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.5); }
     </style>
 </head>
 <body oncontextmenu="return false;">
 
     <div id="reticle"></div>
+    
+    <!-- 레이더 타겟 박스 및 추천 박스, ACM 박스 HTML -->
+    <div id="radar-target-box">
+        <div id="radar-target-dist"></div>
+        <div id="radar-target-rel-speed"></div>
+        <div id="radar-target-dir-container">
+            <div id="radar-target-dir">↑</div>
+        </div>
+    </div>
+    
+    <div id="recommend-box">
+        <div id="rec-dist"></div>
+        <div id="rec-rel-speed"></div>
+        <div id="rec-dir-container">
+            <div id="rec-dir">↑</div>
+        </div>
+    </div>
+    
+    <div id="acm-box"></div>
+
+    <!-- 무장 선택창 HTML -->
+    <div id="weapon-selector">
+        <div id="weapon-name-disp" style="position: absolute; top: -40px; left: 50%; transform: translateX(-50%); font-size: 1.3rem; font-weight: bold; color: #fff; display: none; text-shadow: 2px 2px 4px #000; white-space: nowrap; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 5px; pointer-events: none;"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+        <div class="weapon-box"></div>
+    </div>
 
     <div id="warning-msg">너무 빠릅니다</div>
     <div id="no-ammo-msg">기총 잔탄 없음</div>
@@ -82,6 +352,16 @@
     <div id="seeker-status" style="position: absolute; bottom: 30px; left: 30px; font-size: 1.5rem; font-weight: bold; color: #ffffff; z-index: 10; display: none; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9); pointer-events: none;">시커 : 켜짐</div>
 
     <div id="enemy-labels-container"></div>
+
+    <!-- 레이더 HTML -->
+    <div id="radar-ui">
+        <div class="radar-header-text" id="radar-text-left">70°</div>
+        <div class="radar-header-text" id="radar-text-center">TWS</div>
+        <div class="radar-header-text" id="radar-text-right">72km</div>
+        <div class="radar-grid"></div>
+        <div id="radar-sweep"></div>
+        <div id="radar-blips"></div>
+    </div>
 
     <div id="overlay">
         <h1 style="font-size: 3.5rem; margin-bottom: 10px;">F-16 조종 연습 시뮬레이션</h1>
@@ -102,22 +382,42 @@
             <button onclick="toggleSettings(false)" style="margin-top: 10px; padding: 10px 20px; font-size: 1rem;">닫기</button>
         </div>
         <div id="help-panel">
-            <h2 style="margin-top: 0; text-align: center;">조작법 설명</h2>
-            <ul>
-                <li><b>마우스 이동</b>: 기체 방향 전환 (피치/요)</li>
-                <li><b>W / S</b>: 스로틀(엔진 출력) 증가 / 감소</li>
-                <li><b>A / D</b>: 기체 좌우 롤(회전)</li>
-                <li><b>마우스 좌클릭</b>: 기총 발사</li>
-                <li><b>마우스 우클릭</b>: 시야 줌 토글</li>
-                <li><b>스페이스바</b>: 시커 켜기 / 락온 시 미사일 발사</li>
-                <li><b>Shift</b>: 켜져 있는 시커 끄기</li>
-                <li><b>U (유지)</b>: 최신 미사일 추적 시점</li>
-                <li><b>C (유지)</b>: 자유 카메라 모드</li>
-                <li><b>마우스 휠</b>: 카메라 거리 조절</li>
-                <li><b>ESC</b>: 일시정지 및 메뉴 열기</li>
-            </ul>
-            <div style="text-align: center; margin-top: 20px;">
-                <button onclick="toggleHelp(false)" style="padding: 10px 20px; font-size: 1rem;">뒤로가기</button>
+            <div class="help-page active" id="help-p1">
+                <h2>1. 기본 비행 및 기총</h2>
+                <ul>
+                    <li><b>마우스 이동</b>: 기체의 기수 방향 조절(피치/요).</li>
+                    <li><b>W / S 키</b>: 스로틀 조절. 100% 초과 시 후연기(Afterburner) 가동.</li>
+                    <li><b>A / D 키</b>: 기체 롤(좌우 회전) 조절.</li>
+                    <li><b>마우스 좌클릭</b>: M61A1 Vulcan 기총 발사.</li>
+                    <li><b>마우스 우클릭</b>: 시야 줌 토글(확대/축소).</li>
+                    <li><b>C 키(유지)</b>: 자유 시점 카메라 모드.</li>
+                    <li><b>마우스 휠</b>: 카메라와 기체 사이의 거리 조절.</li>
+                </ul>
+            </div>
+            <div class="help-page" id="help-p2">
+                <h2>2. 레이더 및 추적 시스템</h2>
+                <ul>
+                    <li><b>PageUp</b>: ACM(근접교전) 모드. 19km 이내 적을 자동 락온합니다.</li>
+                    <li><b>PageDown</b>: 레이더 탐지 거리 변경 (10km ~ 160km).</li>
+                    <li><b>Insert</b>: 화면 내 다른 적기를 '추천 추적 대상'으로 변경합니다.</li>
+                    <li><b>Delete</b>: 현재 추천 대상 또는 레이더 블립을 강제 추적(락온)합니다.</li>
+                    <li><b>Alt(유지)</b>: 조종을 멈추고 마우스 커서로 레이더를 직접 클릭하여 대상을 지정합니다.</li>
+                </ul>
+            </div>
+            <div class="help-page" id="help-p3">
+                <h2>3. 무장 관리 시스템</h2>
+                <ul>
+                    <li><b>CapsLock</b>: 하단 무장 선택창을 엽니다. 마우스로 미사일을 선택할 수 있습니다.</li>
+                    <li><b>자동 무장 전환</b>: 선택된 미사일을 다 쓰면 남은 무장으로 자동 교체됩니다.</li>
+                    <li><b>스페이스바</b>: 1단계-미사일 시커 활성화 / 2단계-락온 시 발사.</li>
+                    <li><b>Shift</b>: 가동 중인 미사일 시커를 강제로 종료합니다.</li>
+                    <li><b>U 키(유지)</b>: 마지막으로 발사한 미사일의 시점으로 추적 화면을 봅니다.</li>
+                </ul>
+            </div>
+            <div class="help-nav">
+                <button class="nav-btn" onclick="moveHelp(-1)">이전</button>
+                <button class="nav-btn" onclick="moveHelp(1)">다음</button>
+                <button class="nav-btn" style="background:#ff4444; color:#fff;" onclick="toggleHelp(false)">닫기</button>
             </div>
         </div>
     </div>
@@ -130,7 +430,10 @@
         </div>
     </div>
 
-    <div id="distance-hud">이동 거리: <span id="dist-val">0.00</span> km</div>
+    <div id="distance-hud">
+        이동 거리: <span id="dist-val">0.00</span> km<br>
+        격추한 항공기의 수: <span id="kill-count-val">0</span>
+    </div>
 
     <div id="hud">
         <div class="stat-row" id="throttle-row">
@@ -159,6 +462,18 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
+        // 레이더 및 ACM 스윕 변수
+        let radarSweepTime = 0; 
+        let radarSweepDir = 1;
+        let prevRadarSweepTime = 0; 
+        let isAltHeld = false; 
+        let isWeaponMenuOpen = false;
+        let isAcmMode = false; 
+
+        let currentRadarRange = 72000;
+        const radarRanges = [72000, 100000, 160000, 10000, 35000];
+        let radarRangeIdx = 0;
+
         let isLeftMBDown = false;
         const bullets = [];
         let lastFireTime = 0;
@@ -171,6 +486,32 @@
         let killMsgTimer = 0;
         const killMsgEl = document.getElementById('kill-msg');
         const noAmmoMsgEl = document.getElementById('no-ammo-msg'); 
+        
+        let totalKills = 0;
+        let killStreak = 0;
+        let lastKillTime = 0;
+        
+        function registerKill() {
+            const currentTime = performance.now();
+            if (currentTime - lastKillTime <= 5000) {
+                killStreak++;
+            } else {
+                killStreak = 1;
+            }
+            lastKillTime = currentTime;
+            totalKills++;
+            
+            document.getElementById('kill-count-val').innerText = totalKills;
+            
+            if (killStreak > 1) {
+                killMsgEl.innerText = '항공기 격추 x' + killStreak;
+            } else {
+                killMsgEl.innerText = '항공기 격추';
+            }
+            
+            killMsgEl.style.display = 'block'; 
+            killMsgTimer = 2.0;
+        }
 
         const missiles = [];
         const smokeParticles = [];
@@ -203,12 +544,85 @@
             seekerActive: false,
             isLocked: false,         
             lockedTarget: null,
-            latestMissile: null
+            latestMissile: null,
+            radarTarget: null,
+            softTarget: null,
+            pendingRadarTarget: null,
+            lockTransitionTimer: 0
         };
+
+        // --- 커스텀 무장 시스템 변수 및 함수 ---
+        let weaponLoadout = [null, null, 'AIM-9X', 'AIM-120', 'AIM-120', null, 'AIM-120', 'AIM-120', 'AIM-9X', null, null];
+        let currentWeaponType = 'AIM-9X';
+
+        function updateHUDMissile() {
+            let count = weaponLoadout.filter(w => w === currentWeaponType).length;
+            flight.missileAmmo = count; 
+            
+            const boxes = document.querySelectorAll('.weapon-box');
+            boxes.forEach((box, i) => {
+                box.innerHTML = '';
+                if (weaponLoadout[i]) {
+                    let m = document.createElement('div');
+                    m.className = 'missile-icon aim120-style';
+                    if(weaponLoadout[i] === 'AIM-9X') m.className = 'missile-icon aim9x-style';
+                    
+                    let b = document.createElement('div'); b.className = 'missile-body';
+                    let fh = document.createElement('div'); fh.className = 'missile-fin-h';
+                    let fv = document.createElement('div'); fv.className = 'missile-fin-v';
+                    m.appendChild(fh); m.appendChild(fv); m.appendChild(b);
+                    box.appendChild(m);
+                    
+                    m.onmouseenter = () => { 
+                        document.getElementById('weapon-name-disp').innerText = weaponLoadout[i]; 
+                        document.getElementById('weapon-name-disp').style.display = 'block'; 
+                    };
+                    m.onmouseleave = () => { 
+                        document.getElementById('weapon-name-disp').style.display = 'none'; 
+                    };
+                    
+                    m.onmousedown = (e) => { 
+                        currentWeaponType = weaponLoadout[i];
+                        updateHUDMissile();
+                    };
+                }
+                box.classList.remove('selected');
+                if (weaponLoadout[i] === currentWeaponType) box.classList.add('selected');
+            });
+        }
+
+        function consumeCurrentWeapon() {
+            let order = [0, 10, 1, 9, 2, 8, 3, 7, 4, 6, 5];
+            for(let i of order) {
+                if (weaponLoadout[i] === currentWeaponType) {
+                    weaponLoadout[i] = null;
+                    break;
+                }
+            }
+            updateHUDMissile();
+
+            // 현재 무장을 다 썼다면 남은 다른 무장으로 자동 전환
+            if (flight.missileAmmo <= 0 && !flight.unlimitedMissile) {
+                const remaining = weaponLoadout.find(w => w !== null);
+                if (remaining) {
+                    currentWeaponType = remaining;
+                    updateHUDMissile();
+                }
+            }
+        }
 
         const keys = { w:false, s:false, a:false, d:false, shift:false, c:false, u:false };
         const overlay = document.getElementById('overlay'), gameoverUI = document.getElementById('game-over'), reticleEl = document.getElementById('reticle');
         const warningMsg = document.getElementById('warning-msg');
+
+        let currentHelpPage = 1;
+        function moveHelp(dir) {
+            document.getElementById('help-p' + currentHelpPage).classList.remove('active');
+            currentHelpPage += dir;
+            if (currentHelpPage > 3) currentHelpPage = 1;
+            if (currentHelpPage < 1) currentHelpPage = 3;
+            document.getElementById('help-p' + currentHelpPage).classList.add('active');
+        }
 
         function toggleSettings(show) {
             document.getElementById('main-menu').style.display = show ? 'none' : 'flex';
@@ -217,6 +631,11 @@
         function toggleHelp(show) {
             document.getElementById('main-menu').style.display = show ? 'none' : 'flex';
             document.getElementById('help-panel').style.display = show ? 'block' : 'none';
+            if(show) {
+                currentHelpPage = 1;
+                document.querySelectorAll('.help-page').forEach(p => p.classList.remove('active'));
+                document.getElementById('help-p1').classList.add('active');
+            }
         }
 
         function startGame() {
@@ -225,6 +644,10 @@
             flight.unlimitedFuel = document.getElementById('unlimited-fuel').checked;
             flight.unlimitedAmmo = document.getElementById('unlimited-ammo').checked; 
             flight.unlimitedMissile = document.getElementById('unlimited-missile').checked; 
+            if (flight.unlimitedMissile) {
+                weaponLoadout = [null, null, 'AIM-9X', 'AIM-120', 'AIM-120', null, 'AIM-120', 'AIM-120', 'AIM-9X', null, null];
+                updateHUDMissile();
+            }
             flight.accMult = document.getElementById('acc-multiplier').checked ? 10 : 1;
             flight.speedMult = document.getElementById('speed-multiplier').checked ? 10 : 1;
             renderer.domElement.requestPointerLock();
@@ -372,9 +795,15 @@
         const innerEdges = new THREE.EdgesGeometry(innerGeo);
         const innerMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
         const seekerInner = new THREE.LineSegments(innerEdges, innerMat);
+
+        const tinyGeo = new THREE.CircleGeometry(1.5, 16);
+        const tinyEdges = new THREE.EdgesGeometry(tinyGeo);
+        const tinyMat = new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0 });
+        const seekerTiny = new THREE.LineSegments(tinyEdges, tinyMat);
         
         seekerGroup.add(seekerOuter);
         seekerGroup.add(seekerInner);
+        seekerGroup.add(seekerTiny);
         
         seekerGroup.position.set(0, -5.4, -100); 
         seekerGroup.visible = false;
@@ -416,8 +845,10 @@
 
             for(let i=0; i<16; i++) {
                 const mesh = eGroup.clone();
-                const x = (Math.random() - 0.5) * 7000;
-                const z = (Math.random() - 0.5) * 7000;
+                const angle = Math.random() * Math.PI * 2;
+                const rDist = 20000 + Math.random() * 30000;
+                const x = Math.cos(angle) * rDist;
+                const z = Math.sin(angle) * rDist;
                 const y = 500 + Math.random() * 2000; 
                 
                 mesh.position.set(x, y, z);
@@ -439,6 +870,7 @@
             }
         }
         spawnEnemies();
+        updateHUDMissile(); 
 
         function fireMissile() {
             const m = missileGeo.clone();
@@ -452,44 +884,182 @@
 
             const initialDir = new THREE.Vector3(0, 0, -1).applyQuaternion(jetGroup.quaternion);
             
+            const isAmraam = (currentWeaponType === 'AIM-120');
+            let activeR = true;
+            if (isAmraam && flight.lockedTarget) {
+                const dist = jetGroup.position.distanceTo(flight.lockedTarget.mesh.position);
+                if (dist > 40000) activeR = false; 
+            }
+
             missiles.push({
                 mesh: m,
                 target: flight.lockedTarget,
                 velocity: initialDir.clone().multiplyScalar(flight.speed / 3.6),
                 speed: flight.speed / 3.6,
                 lifeTime: 0,
-                active: true
+                active: true,
+                prevDist: undefined,
+                missed: false,
+                missTimer: 0,
+                type: currentWeaponType,
+                isActiveRadar: activeR,
+                radarSupportTimer: 0,
+                launchPos: m.position.clone() 
             });
 
             flight.latestMissile = missiles[missiles.length - 1];
         }
 
-        document.addEventListener('pointerlockchange', () => { if(isGameOver) return; isPaused = (document.pointerLockElement !== renderer.domElement); overlay.style.display = isPaused ? 'flex' : 'none'; reticleEl.style.display = isPaused ? 'none' : 'block'; });
+        document.addEventListener('pointerlockchange', () => { 
+            if(isGameOver) return; 
+            if(isAltHeld || isWeaponMenuOpen) return; 
+            isPaused = (document.pointerLockElement !== renderer.domElement); 
+            overlay.style.display = isPaused ? 'flex' : 'none'; 
+            reticleEl.style.display = isPaused ? 'none' : 'block'; 
+        });
         
+        document.getElementById('radar-ui').addEventListener('mousedown', function(e) {
+            if (!isAltHeld) return;
+            e.stopPropagation(); 
+            const rect = this.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left) / rect.width;
+            const clickY = (e.clientY - rect.top) / rect.height;
+            
+            let closestEnemy = null;
+            let minDist = 0.1; 
+            
+            enemies.forEach(enemy => {
+                if (enemy.active && enemy.radarMemory) {
+                    const dx = enemy.radarMemory.x - clickX;
+                    const dy = enemy.radarMemory.y - clickY;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestEnemy = enemy;
+                    }
+                }
+            });
+            
+            if (closestEnemy) {
+                flight.radarTarget = closestEnemy;
+                const targetBox = document.getElementById('radar-target-box');
+                targetBox.style.animation = 'none';
+                void targetBox.offsetWidth;
+                targetBox.style.animation = 'lockEngage 0.15s ease-out forwards';
+            }
+        });
+
         window.addEventListener('mousedown', (e) => { 
+            if (isWeaponMenuOpen) {
+                isWeaponMenuOpen = false;
+                document.getElementById('weapon-selector').style.display = 'none';
+                renderer.domElement.requestPointerLock();
+                return;
+            }
             if(e.button === 2) {
                 isRightMBDown = true; 
                 isZoomed = !isZoomed; 
             }
             if(e.button === 0) isLeftMBDown = true; 
         });
+
         window.addEventListener('mouseup', (e) => { 
             if(e.button === 2) isRightMBDown = false; 
             if(e.button === 0) isLeftMBDown = false; 
         });
 
-        window.addEventListener('keydown', (e) => { const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k)) keys[k]=true; });
+        window.addEventListener('keydown', (e) => { 
+            if (e.code === 'PageDown' && !isPaused && !isGameOver) {
+                radarRangeIdx = (radarRangeIdx + 1) % radarRanges.length;
+                currentRadarRange = radarRanges[radarRangeIdx];
+                document.getElementById('radar-text-right').innerText = (currentRadarRange / 1000) + 'km';
+            }
+            if (e.code === 'PageUp') {
+                if (flight.radarTarget) {
+                    flight.radarTarget = null;
+                    isAcmMode = false;
+                    flight.seekerActive = false; 
+                } else {
+                    isAcmMode = !isAcmMode;
+                    if (!isAcmMode) flight.seekerActive = false; 
+                }
+            }
+            if (e.code === 'Delete' && !isPaused && !isGameOver) {
+                if (flight.radarTarget) {
+                    flight.radarTarget = null;
+                    flight.seekerActive = false;
+                } else if (flight.softTarget && flight.lockTransitionTimer <= 0) {
+                    flight.pendingRadarTarget = flight.softTarget;
+                    flight.lockTransitionTimer = 0.2;
+                }
+            }
+            if (e.code === 'Insert' && !isPaused && !isGameOver) {
+                let detected = enemies.filter(en => {
+                    if (!en.active || !en.radarMemory) return false;
+                    const enemyWorldPos = new THREE.Vector3();
+                    en.mesh.getWorldPosition(enemyWorldPos);
+                    const screenPos = enemyWorldPos.clone().project(camera);
+                    return screenPos.z < 1.0 && screenPos.z > -1.0 && screenPos.x > -0.9 && screenPos.x < 0.9 && screenPos.y > -0.8 && screenPos.y < 0.8;
+                });
+                const jetWorldPos = new THREE.Vector3();
+                jetGroup.getWorldPosition(jetWorldPos);
+                detected.sort((a, b) => jetWorldPos.distanceTo(a.mesh.position) - jetWorldPos.distanceTo(b.mesh.position));
+                
+                if (detected.length > 0) {
+                    let idx = detected.indexOf(flight.softTarget);
+                    if (idx === -1) idx = 0;
+                    idx = (idx + 1) % detected.length;
+                    flight.softTarget = detected[idx];
+                }
+            }
+            if (e.key === 'Alt') {
+                e.preventDefault();
+                if (!isAltHeld && !isPaused && !isGameOver) {
+                    isAltHeld = true;
+                    document.exitPointerLock();
+                }
+            }
+            if (e.code === 'CapsLock' && !isPaused && !isGameOver) {
+                const wSelector = document.getElementById('weapon-selector');
+                if (!isWeaponMenuOpen) {
+                    isWeaponMenuOpen = true;
+                    wSelector.style.display = 'flex';
+                    document.exitPointerLock();
+                } else {
+                    isWeaponMenuOpen = false;
+                    wSelector.style.display = 'none';
+                    renderer.domElement.requestPointerLock();
+                }
+            }
+            const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k)) keys[k]=true; 
+        });
         
         window.addEventListener('keydown', (e) => { 
             if (e.code === 'Space' && !isPaused && !isGameOver) {
-                if (flight.seekerActive && flight.isLocked && flight.lockedTarget && flight.lockedTarget.active && (flight.missileAmmo > 0 || flight.unlimitedMissile)) {
-                    fireMissile();
-                    if (!flight.unlimitedMissile) flight.missileAmmo--;
-                    flight.seekerActive = false; 
+                if (currentWeaponType === 'AIM-120') {
+                    let displaySoftTarget = flight.pendingRadarTarget ? flight.pendingRadarTarget : flight.softTarget;
+                    let target = (flight.radarTarget && flight.radarTarget.active) ? flight.radarTarget : ((displaySoftTarget && displaySoftTarget.active) ? displaySoftTarget : null);
+                    if (!flight.seekerActive && target) {
+                        const jPos = new THREE.Vector3(); jetGroup.getWorldPosition(jPos);
+                        const tPos = new THREE.Vector3(); target.mesh.getWorldPosition(tPos);
+                        if (jPos.distanceTo(tPos) <= 160000 && (flight.missileAmmo > 0 || flight.unlimitedMissile)) {
+                            flight.seekerActive = true;
+                        }
+                    } else if (flight.seekerActive && flight.isLocked && flight.lockedTarget && flight.lockedTarget.active && (flight.missileAmmo > 0 || flight.unlimitedMissile)) {
+                        fireMissile();
+                        if (!flight.unlimitedMissile) consumeCurrentWeapon();
+                        flight.seekerActive = false;
+                    }
                 } else {
-                    if (!flight.seekerActive && flight.missileAmmo <= 0 && !flight.unlimitedMissile) {
+                    if (flight.seekerActive && flight.isLocked && flight.lockedTarget && flight.lockedTarget.active && (flight.missileAmmo > 0 || flight.unlimitedMissile)) {
+                        fireMissile();
+                        if (!flight.unlimitedMissile) consumeCurrentWeapon();
+                        flight.seekerActive = false; 
                     } else {
-                        flight.seekerActive = !flight.seekerActive;
+                        if (!flight.seekerActive && flight.missileAmmo <= 0 && !flight.unlimitedMissile) {
+                        } else {
+                            flight.seekerActive = !flight.seekerActive;
+                        }
                     }
                 }
             }
@@ -498,11 +1068,20 @@
             }
         });
 
-        window.addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k)) keys[k]=false; });
+        window.addEventListener('keyup', (e) => { 
+            if (e.key === 'Alt') {
+                e.preventDefault();
+                if (isAltHeld) {
+                    isAltHeld = false;
+                    renderer.domElement.requestPointerLock();
+                }
+            }
+            const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k)) keys[k]=false; 
+        });
         window.addEventListener('wheel', (e) => { if (isPaused || isGameOver) return; flight.camDist = Math.max(15, Math.min(flight.camDist + e.deltaY * 0.05, 500)); });
 
         document.addEventListener('mousemove', (e) => {
-            if (isPaused || isGameOver) return;
+            if (isPaused || isGameOver || isAltHeld || isWeaponMenuOpen) return; 
             if (keys.c) { flight.freeCamYaw -= e.movementX * 0.005; flight.freeCamPitch -= e.movementY * 0.005; }
             else {
                 const sens = 0.0025; flight.yaw -= e.movementX * sens; flight.pitch -= e.movementY * sens;
@@ -573,9 +1152,11 @@
                 jetGroup.position.x = 0;
             }
 
-            if (keys.a) flight.roll -= 5.5 * dt; else if (keys.d) flight.roll += 5.5 * dt;
-            else { let diff = (flight.autoBank - flight.roll) % (Math.PI * 2); if (diff < -Math.PI) diff += Math.PI * 2; if (diff > Math.PI) diff -= Math.PI * 2; flight.roll += diff * 4.0 * dt; }
-            flight.autoBank *= (1 - 5.0 * dt);
+            if (!isAltHeld) {
+                if (keys.a) flight.roll -= 5.5 * dt; else if (keys.d) flight.roll += 5.5 * dt;
+                else { let diff = (flight.autoBank - flight.roll) % (Math.PI * 2); if (diff < -Math.PI) diff += Math.PI * 2; if (diff > Math.PI) diff -= Math.PI * 2; flight.roll += diff * 4.0 * dt; }
+                flight.autoBank *= (1 - 5.0 * dt);
+            }
 
             jetGroup.rotation.set(0, 0, 0); jetGroup.rotateY(flight.yaw); jetGroup.rotateX(flight.pitch); jetGroup.rotateZ(-flight.roll);
             const speedMs = flight.speed / 3.6; flight.totalDist += (speedMs * dt) / 1000;
@@ -594,8 +1175,13 @@
                     if (enemy.label) enemy.label.style.display = 'none';
                     enemy.respawnTimer -= dt;
                     if (enemy.respawnTimer <= 0) {
-                        const x = (Math.random() - 0.5) * 7000;
-                        const z = (Math.random() - 0.5) * 7000;
+                        const jetX = -landGroup.position.x;
+                        const jetZ = -landGroup.position.z;
+                        const angle = Math.random() * Math.PI * 2;
+                        const rDist = 20000 + Math.random() * 30000;
+                        const x = jetX + Math.cos(angle) * rDist;
+                        const z = jetZ + Math.sin(angle) * rDist;
+                        
                         const y = 500 + Math.random() * 2000;
                         enemy.mesh.position.set(x, y, z);
                         enemy.mesh.rotation.y = Math.random() * Math.PI * 2;
@@ -622,18 +1208,22 @@
             });
 
             labelCandidates.sort((a, b) => a.dist - b.dist);
-            labelCandidates.forEach((item, index) => {
-                if (index < 5) {
+            let visibleLabelCount = 0;
+            labelCandidates.forEach((item) => {
+                if (item.enemy === flight.radarTarget || item.enemy === flight.softTarget || item.enemy === flight.pendingRadarTarget) {
+                    item.enemy.label.style.display = 'none';
+                } else if (visibleLabelCount < 3) {
                     item.enemy.label.style.display = 'block';
                     item.enemy.label.style.left = item.pixelX + 'px';
                     item.enemy.label.style.top = (item.pixelY + 30) + 'px'; 
                     item.enemy.label.innerText = (item.dist / 1000).toFixed(2) + ' km';
+                    visibleLabelCount++;
                 } else { item.enemy.label.style.display = 'none'; }
             });
 
-            if (flight.ammo <= 0 && !flight.unlimitedAmmo && isLeftMBDown) { noAmmoMsgEl.style.display = 'block'; } else { noAmmoMsgEl.style.display = 'none'; }
+            if (flight.ammo <= 0 && !flight.unlimitedAmmo && isLeftMBDown && !isAltHeld) { noAmmoMsgEl.style.display = 'block'; } else { noAmmoMsgEl.style.display = 'none'; }
 
-            if (isLeftMBDown && now - lastFireTime > 10 && (flight.ammo > 0 || flight.unlimitedAmmo)) { 
+            if (isLeftMBDown && now - lastFireTime > 10 && (flight.ammo > 0 || flight.unlimitedAmmo) && !isAltHeld) { 
                 lastFireTime = now;
                 if (!flight.unlimitedAmmo) flight.ammo--; 
                 const bullet = new THREE.Mesh(bulletGeo, bulletMat);
@@ -660,47 +1250,121 @@
                         const exp = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 1 }));
                         exp.position.copy(enemy.mesh.position); 
                         landGroup.add(exp); enemyExplosions.push({ mesh: exp, size: 1, life: 1.0 });
-                        killMsgEl.style.display = 'block'; killMsgTimer = 2.0; break;
+                        registerKill(); break;
                     }
                 }
                 if (isHit || now - b.userData.spawnTime > 2000) { scene.remove(b); bullets.splice(i, 1); }
             }
 
-            // 미사일 처리 루프
             for (let i = missiles.length - 1; i >= 0; i--) {
                 const m = missiles[i];
                 m.lifeTime += dt;
-                if (m.lifeTime < 60) { m.speed = Math.min(1700, m.speed + (1700 / 60) * dt); } 
-                else { m.speed = Math.max(100, m.speed - 30 * dt); }
+                
+                if (m.type === 'AIM-120') {
+                    if (m.lifeTime > 300) { 
+                        const exp = new THREE.Mesh(new THREE.SphereGeometry(3, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 1 }));
+                        exp.position.copy(m.mesh.position);
+                        scene.add(exp);
+                        enemyExplosions.push({ mesh: exp, size: 1, life: 1.0 });
+                        scene.remove(m.mesh);
+                        missiles.splice(i, 1);
+                        continue;
+                    }
+                }
+                
+                if (m.missed) {
+                    m.missTimer += dt;
+                    if (m.missTimer >= 2.0) {
+                        const exp = new THREE.Mesh(new THREE.SphereGeometry(3, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 1 }));
+                        exp.position.copy(m.mesh.position);
+                        scene.add(exp);
+                        enemyExplosions.push({ mesh: exp, size: 1, life: 1.0 });
+                        scene.remove(m.mesh);
+                        missiles.splice(i, 1);
+                        continue;
+                    }
+                }
+                
+                if (m.type === 'AIM-120') {
+                    const targetMaxSpeed = 1361; 
+                    if (m.lifeTime < 120) { 
+                        m.speed = Math.min(targetMaxSpeed, m.speed + (targetMaxSpeed / 120) * dt); 
+                    } else { 
+                        m.speed = targetMaxSpeed; 
+                    }
+
+                    if (!m.isActiveRadar) {
+                        m.radarSupportTimer += dt;
+                        let trackedByJet = false;
+                        if (flight.radarTarget === m.target || flight.softTarget === m.target || flight.lockedTarget === m.target) {
+                            trackedByJet = true;
+                        }
+                        if (trackedByJet) {
+                            if (m.radarSupportTimer >= 2.0) {
+                                m.isActiveRadar = true;
+                            }
+                        } else {
+                            m.target = null; 
+                        }
+                    }
+                } else {
+                    const targetMaxSpeed = 850.7; 
+                    if (m.lifeTime < 60) { 
+                        m.speed = Math.min(targetMaxSpeed, m.speed + (targetMaxSpeed / 60) * dt); 
+                    } 
+                    else { 
+                        m.speed = Math.max(100, m.speed - 30 * dt); 
+                    }
+                }
 
                 const currentDir = m.velocity.clone().normalize();
                 
-                // 추적 로직 (최대 40도 제한)
-                if (m.target && m.target.active) {
+                if (m.target && m.target.active && !m.missed) {
                     const targetWorldPos = new THREE.Vector3();
                     m.target.mesh.getWorldPosition(targetWorldPos);
-                    const dirToTarget = targetWorldPos.clone().sub(m.mesh.position).normalize();
                     
-                    const angle = currentDir.angleTo(dirToTarget);
-                    // 40도(약 0.698 라디안)를 넘으면 추적 포기
-                    if (angle > 0.698) {
-                        m.target = null; 
+                    const distToTarget = m.mesh.position.distanceTo(targetWorldPos);
+                    if (m.prevDist === undefined) m.prevDist = distToTarget;
+                    
+                    if (m.lifeTime > 0.5 && distToTarget > m.prevDist + 5.0) {
+                        m.missed = true;
+                        m.target = null;
                     } else {
-                        const maxAcc = 800; 
-                        const maxTurnRate = maxAcc / Math.max(10, m.speed);
-                        const maxAngle = maxTurnRate * dt;
-                        if (angle > maxAngle) {
-                            const axis = new THREE.Vector3().crossVectors(currentDir, dirToTarget).normalize();
-                            currentDir.applyAxisAngle(axis, maxAngle);
+                        if (distToTarget < m.prevDist) m.prevDist = distToTarget;
+                    }
+                    
+                    if (m.target) {
+                        const dirToTarget = targetWorldPos.clone().sub(m.mesh.position).normalize();
+                        
+                        const targetForward = new THREE.Vector3(0, 0, -1).applyQuaternion(m.target.mesh.quaternion).normalize();
+                        const toMissile = m.mesh.position.clone().sub(targetWorldPos).normalize();
+                        const aspect = targetForward.dot(toMissile);
+                        const heatSig = Math.max(0.2, (aspect + 1) / 2); 
+
+                        const angle = currentDir.angleTo(dirToTarget);
+                        if (angle > 1.047) { 
+                            m.target = null; 
                         } else {
-                            currentDir.copy(dirToTarget);
+                            let maxAcc = 3500 * heatSig; 
+                            if (m.type === 'AIM-120') maxAcc = 7000 * heatSig; // 암람 기동성 향상
+                            const maxTurnRate = maxAcc / Math.max(10, m.speed);
+                            const maxAngle = maxTurnRate * dt;
+                            if (angle > maxAngle) {
+                                const axis = new THREE.Vector3().crossVectors(currentDir, dirToTarget).normalize();
+                                currentDir.applyAxisAngle(axis, maxAngle);
+                            } else {
+                                currentDir.copy(dirToTarget);
+                            }
                         }
                     }
                 }
                 
-                // 추적 대상이 없으면 중력 적용 (서서히 떨어짐)
                 if (!m.target) {
-                    m.velocity.y -= 400 * dt; 
+                    if (m.missed) {
+                        m.velocity.copy(currentDir).multiplyScalar(m.speed); 
+                    } else {
+                        m.velocity.y -= 400 * dt; 
+                    }
                 } else {
                     m.velocity.copy(currentDir).multiplyScalar(m.speed);
                 }
@@ -708,15 +1372,14 @@
                 m.mesh.lookAt(m.mesh.position.clone().add(m.velocity.clone().normalize()));
                 m.mesh.position.addScaledVector(m.velocity, dt);
 
-                // 지형 충돌 및 추격 실패 폭파 체크
                 let hitTerrain = false;
-                if (m.mesh.position.y <= 5) { hitTerrain = true; } // 바닥 충돌
+                if (m.mesh.position.y <= 5) { hitTerrain = true; } 
                 
                 const mMapX = m.mesh.position.x - landGroup.position.x;
                 const mMapZ = m.mesh.position.z - landGroup.position.z;
                 for (let c of colliders) {
                     if (Math.sqrt((mMapX - c.x)**2 + (mMapZ - c.z)**2) < c.radius && m.mesh.position.y < c.height) {
-                        hitTerrain = true; // 산 충돌
+                        hitTerrain = true; 
                         break;
                     }
                 }
@@ -731,7 +1394,6 @@
                     continue;
                 }
 
-                // 스모크 파티클
                 if (m.speed > 100) {
                     const sm = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 1.0}));
                     sm.position.copy(m.mesh.position).add(m.velocity.clone().normalize().multiplyScalar(-1.5));
@@ -739,18 +1401,17 @@
                     scene.add(sm); smokeParticles.push({ mesh: sm, life: 4.0 });
                 }
 
-                // 적중 체크
                 if (m.target && m.target.active) {
                     const targetWorldPos = new THREE.Vector3();
                     m.target.mesh.getWorldPosition(targetWorldPos);
-                    if (m.mesh.position.distanceTo(targetWorldPos) <= 8.0) { 
+                    if (m.mesh.position.distanceTo(targetWorldPos) <= 30.0) { 
                         m.target.active = false; m.target.mesh.visible = false; m.target.respawnTimer = 3.0;
                         const exp = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 1 }));
                         exp.position.copy(m.target.mesh.position); landGroup.add(exp); enemyExplosions.push({ mesh: exp, size: 1, life: 1.0 });
-                        killMsgEl.style.display = 'block'; killMsgTimer = 2.0; scene.remove(m.mesh); missiles.splice(i, 1); continue;
+                        registerKill(); scene.remove(m.mesh); missiles.splice(i, 1); continue;
                     }
                 }
-                if (m.lifeTime > 75) { scene.remove(m.mesh); missiles.splice(i, 1); }
+                if (m.type !== 'AIM-120' && m.lifeTime > 75) { scene.remove(m.mesh); missiles.splice(i, 1); }
             }
 
             for (let i = smokeParticles.length - 1; i >= 0; i--) {
@@ -795,26 +1456,127 @@
             if (flight.boomTime > 0) { flight.boomTime -= dt * 1.5; sonicBoom.scale.set(1 + (1 - flight.boomTime) * 15, 1 + (1 - flight.boomTime) * 15, 1); sonicBoom.material.opacity = flight.boomTime * 0.6; }
 
             if (flight.seekerActive) {
-                seekerGroup.visible = true; seekerGroup.position.copy(new THREE.Vector3(0, -5.4, -100).applyAxisAngle(new THREE.Vector3(0, 0, 1), flight.roll)); seekerGroup.rotation.z = flight.roll;
-                let isLocked = false; let currentTarget = null;
-                const seekerWorldPos = new THREE.Vector3(); seekerGroup.getWorldPosition(seekerWorldPos);
-                const seekerScreenPos = seekerWorldPos.clone().project(camera);
-                const sPX = seekerScreenPos.x * (window.innerWidth / 2), sPY = seekerScreenPos.y * (window.innerHeight / 2);
-                for (let j = 0; j < enemies.length; j++) {
-                    const enemy = enemies[j]; if (!enemy.active) continue;
-                    const enemyWorldPos = new THREE.Vector3(); enemy.mesh.getWorldPosition(enemyWorldPos);
-                    if (jetWorldPos.distanceTo(enemyWorldPos) <= 5000) {
-                        const screenPos = enemyWorldPos.clone().project(camera);
-                        if (screenPos.z < 1.0 && seekerScreenPos.z < 1.0) {
-                            const ePX = screenPos.x * (window.innerWidth / 2), ePY = screenPos.y * (window.innerHeight / 2);
-                            if (Math.sqrt((ePX - sPX)**2 + (ePY - sPY)**2) <= 30) { isLocked = true; currentTarget = enemy; break; }
+                seekerGroup.visible = true;
+                seekerGroup.position.copy(new THREE.Vector3(0, -5.4, -100).applyAxisAngle(new THREE.Vector3(0, 0, 1), flight.roll));
+                seekerGroup.rotation.z = flight.roll;
+                jetGroup.updateMatrixWorld();
+                seekerGroup.updateMatrixWorld();
+                
+                let isLocked = false; 
+                let currentTarget = null;
+                let trackingTarget = null;
+
+                if (currentWeaponType === 'AIM-120') {
+                    let displaySoftTarget = flight.pendingRadarTarget ? flight.pendingRadarTarget : flight.softTarget;
+                    let tempTarget = null;
+                    if (flight.radarTarget && flight.radarTarget.active) {
+                        tempTarget = flight.radarTarget;
+                    } else if (displaySoftTarget && displaySoftTarget.active) {
+                        tempTarget = displaySoftTarget;
+                    }
+                    
+                    if (tempTarget) {
+                        const targetWorldPos = new THREE.Vector3();
+                        tempTarget.mesh.getWorldPosition(targetWorldPos);
+                        if (jetWorldPos.distanceTo(targetWorldPos) <= 160000) {
+                            trackingTarget = tempTarget;
+                            isLocked = true;
+                            currentTarget = trackingTarget;
+                        } else {
+                            flight.seekerActive = false;
+                        }
+                    } else {
+                        flight.seekerActive = false; 
+                    }
+                } else {
+                    if (flight.radarTarget && flight.radarTarget.active) {
+                        trackingTarget = flight.radarTarget;
+                        const targetWorldPos = new THREE.Vector3();
+                        trackingTarget.mesh.getWorldPosition(targetWorldPos);
+                        if (jetWorldPos.distanceTo(targetWorldPos) <= 5000) {
+                            isLocked = true;
+                            currentTarget = trackingTarget;
+                        }
+                    } else {
+                        const seekerWorldPos = new THREE.Vector3(); seekerGroup.getWorldPosition(seekerWorldPos);
+                        const seekerScreenPos = seekerWorldPos.clone().project(camera);
+                        const sPX = seekerScreenPos.x * (window.innerWidth / 2), sPY = seekerScreenPos.y * (window.innerHeight / 2);
+                        
+                        for (let j = 0; j < enemies.length; j++) {
+                            const enemy = enemies[j]; if (!enemy.active) continue;
+                            const enemyWorldPos = new THREE.Vector3(); enemy.mesh.getWorldPosition(enemyWorldPos);
+                            if (jetWorldPos.distanceTo(enemyWorldPos) <= 5000) {
+                                const screenPos = enemyWorldPos.clone().project(camera);
+                                if (screenPos.z < 1.0 && seekerScreenPos.z < 1.0) {
+                                    const ePX = screenPos.x * (window.innerWidth / 2), ePY = screenPos.y * (window.innerHeight / 2);
+                                    const lockThreshold = 30; 
+                                    if (Math.sqrt((ePX - sPX)**2 + (ePY - sPY)**2) <= lockThreshold) { 
+                                        isLocked = true; 
+                                        currentTarget = enemy; 
+                                        trackingTarget = enemy;
+                                        break; 
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+
+                if (trackingTarget) {
+                    const targetWorldPos = new THREE.Vector3();
+                    trackingTarget.mesh.getWorldPosition(targetWorldPos);
+                    
+                    const localCamPos = camera.position.clone();
+                    jetGroup.worldToLocal(localCamPos);
+                    
+                    const localTargetPos = targetWorldPos.clone();
+                    jetGroup.worldToLocal(localTargetPos);
+                    
+                    const localCamToTargetDir = localTargetPos.clone().sub(localCamPos).normalize();
+                    
+                    if (localCamToTargetDir.z < 0) {
+                        const t = (-100 - localCamPos.z) / localCamToTargetDir.z;
+                        if (t > 0) {
+                            const intersectPos = localCamPos.clone().add(localCamToTargetDir.multiplyScalar(t));
+                            seekerGroup.position.copy(intersectPos);
+                        }
+                    }
+                }
+                
+                seekerInner.position.set(0, 0, 0); 
+                seekerTiny.position.set(0, 0, 0);
+                
                 flight.isLocked = isLocked; flight.lockedTarget = currentTarget;
-                if (isLocked) { outerMat.color.setHex(0xff0000); innerMat.color.setHex(0xff0000); innerMat.opacity = 1.0; seekerOuter.scale.set(0.95, 0.95, 0.95); } 
-                else { outerMat.color.setHex(0xffffff); innerMat.color.setHex(0xffffff); outerMat.opacity = 0.8; innerMat.opacity = (Math.floor(now / 150) % 2 === 0) ? 0.8 : 0.2; seekerOuter.scale.set(1.0, 1.0, 1.0); }
-            } else { seekerGroup.visible = false; flight.isLocked = false; flight.lockedTarget = null; }
+                
+                if (isLocked) { 
+                    const targetWorldPos = new THREE.Vector3();
+                    currentTarget.mesh.getWorldPosition(targetWorldPos);
+                    const dist = jetWorldPos.distanceTo(targetWorldPos);
+                    
+                    if (currentWeaponType === 'AIM-120') {
+                        if (dist <= 20000) {
+                            outerMat.color.setHex(0xff0000); innerMat.color.setHex(0xff0000); tinyMat.color.setHex(0xff0000);
+                            innerMat.opacity = 1.0; tinyMat.opacity = 1.0; seekerOuter.scale.set(0.95, 0.95, 0.95);
+                        } else if (dist <= 40000) {
+                            outerMat.color.setHex(0xff0000); innerMat.color.setHex(0xff0000);
+                            innerMat.opacity = 1.0; tinyMat.opacity = 0.0; seekerOuter.scale.set(0.95, 0.95, 0.95);
+                        } else {
+                            outerMat.color.setHex(0xffffff); innerMat.color.setHex(0xffffff);
+                            outerMat.opacity = 0.8; innerMat.opacity = (Math.floor(now / 150) % 2 === 0) ? 0.8 : 0.2; tinyMat.opacity = 0.0;
+                            seekerOuter.scale.set(1.0, 1.0, 1.0);
+                        }
+                    } else {
+                        outerMat.color.setHex(0xff0000); innerMat.color.setHex(0xff0000); 
+                        innerMat.opacity = 1.0; tinyMat.opacity = 0.0; seekerOuter.scale.set(0.95, 0.95, 0.95); 
+                    }
+                } else { 
+                    outerMat.color.setHex(0xffffff); innerMat.color.setHex(0xffffff); 
+                    outerMat.opacity = 0.8; innerMat.opacity = (Math.floor(now / 150) % 2 === 0) ? 0.8 : 0.2; tinyMat.opacity = 0.0;
+                    seekerOuter.scale.set(1.0, 1.0, 1.0); 
+                }
+            } else { 
+                seekerGroup.visible = false; flight.isLocked = false; flight.lockedTarget = null; 
+            }
 
             document.getElementById('throttle').innerText = Math.floor(flight.throttle);
             document.getElementById('speed').innerText = Math.floor(flight.speed).toLocaleString();
@@ -822,8 +1584,12 @@
             document.getElementById('alt').innerText = Math.floor(flight.altitude).toLocaleString();
             document.getElementById('dist-val').innerText = flight.totalDist.toFixed(2);
             document.getElementById('ammo').innerText = flight.unlimitedAmmo ? "무제한" : flight.ammo;
+            
+            // 변경된 미사일 라벨 및 수량 업데이트
+            document.querySelector('#missile-row .label').innerText = currentWeaponType;
             document.getElementById('missile-count').innerText = flight.unlimitedMissile ? "( 무제한 )" : `( ${flight.missileAmmo} )`;
             if(!flight.unlimitedMissile && flight.missileAmmo <= 0) document.getElementById('missile-row').classList.add('no-missile'); else document.getElementById('missile-row').classList.remove('no-missile');
+            
             document.getElementById('seeker-status').style.display = flight.seekerActive ? 'block' : 'none';
             if (flight.unlimitedFuel) document.getElementById('fuel-display').innerText = `무제한, (100.0%)`;
             else { let m = Math.floor(flight.fuelTime / 60), s = Math.floor(flight.fuelTime % 60); document.getElementById('fuel-display').innerText = `${m}:${s.toString().padStart(2, '0')}, (${flight.fuelPct.toFixed(1)}%)`; }
@@ -832,6 +1598,348 @@
             if(!flight.unlimitedFuel && flight.fuelPct < 20) document.getElementById('fuel-row').classList.add('fuel-low'); else document.getElementById('fuel-row').classList.remove('fuel-low');
             flight.reticleX *= (1 - 1.0 * dt); flight.reticleY *= (1 - 1.0 * dt);
             reticleEl.style.left = (window.innerWidth / 2 + flight.reticleX) + 'px'; reticleEl.style.top = (window.innerHeight / 2 + flight.reticleY) + 'px';
+
+            const radarUi = document.getElementById('radar-ui');
+            if (isGameOver || isPaused) {
+                radarUi.style.display = 'none';
+            } else {
+                radarUi.style.display = 'block';
+                const radarSweepEl = document.getElementById('radar-sweep');
+                const radarBlipsEl = document.getElementById('radar-blips');
+                
+                const radarTextCenter = document.getElementById('radar-text-center');
+                const radarGrid = document.querySelector('.radar-grid');
+                if (isAcmMode) {
+                    radarTextCenter.innerText = "ACM MOD";
+                    radarGrid.style.opacity = (Math.floor(now / 200) % 2 === 0) ? 0.3 : 1.0;
+                    radarSweepEl.style.display = 'none'; 
+                } else {
+                    radarTextCenter.innerText = "TWS";
+                    radarGrid.style.opacity = 1.0;
+                    radarSweepEl.style.display = 'block'; 
+                }
+                
+                prevRadarSweepTime = radarSweepTime;
+                radarSweepTime += dt * 1 * radarSweepDir; 
+                if (radarSweepTime >= 1) { radarSweepTime = 1; radarSweepDir = -1; }
+                else if (radarSweepTime <= 0) { radarSweepTime = 0; radarSweepDir = 1; }
+                radarSweepEl.style.left = (radarSweepTime * 100) + '%';
+
+                radarBlipsEl.innerHTML = '';
+                const maxRadarRange = currentRadarRange; 
+                const maxRadarAngle = THREE.MathUtils.degToRad(70); 
+
+                let svgLines = `<svg width="100%" height="100%" style="position:absolute; top:0; left:0; pointer-events:none; z-index:1;">`;
+                missiles.forEach(m => {
+                    if (m.type === 'AIM-120') {
+                        const getRadarPos = (worldPos) => {
+                            const toPos = worldPos.clone().sub(jetWorldPos);
+                            const dist = toPos.length();
+                            const localPos = toPos.clone().applyQuaternion(jetGroup.quaternion.clone().invert());
+                            const azimuthAngle = Math.atan2(localPos.x, -localPos.z);
+                            if (localPos.z >= 0) return null; 
+                            const radarX = (azimuthAngle / maxRadarAngle) * 0.5 + 0.5;
+                            const radarY = 1.0 - (dist / maxRadarRange);
+                            return { x: radarX * 100, y: radarY * 100 };
+                        };
+                        const startP = getRadarPos(m.launchPos);
+                        const currP = getRadarPos(m.mesh.position);
+                        
+                        if (startP && currP) {
+                            svgLines += `<line x1="${startP.x}%" y1="${startP.y}%" x2="${currP.x}%" y2="${currP.y}%" stroke="#00ffff" stroke-width="1.5" opacity="0.8"/>`;
+                        } else if (currP) {
+                            svgLines += `<line x1="50%" y1="100%" x2="${currP.x}%" y2="${currP.y}%" stroke="#00ffff" stroke-width="1.5" opacity="0.8"/>`;
+                        }
+                    }
+                });
+                svgLines += `</svg>`;
+                radarBlipsEl.innerHTML = svgLines;
+
+                enemies.forEach(enemy => {
+                    if (!enemy.active) {
+                        enemy.radarMemory = null;
+                        return;
+                    }
+
+                    const enemyWorldPos = new THREE.Vector3();
+                    enemy.mesh.getWorldPosition(enemyWorldPos);
+                    const toEnemy = enemyWorldPos.clone().sub(jetWorldPos);
+                    const dist = toEnemy.length();
+
+                    if (dist <= maxRadarRange) {
+                        const localPos = toEnemy.clone().applyQuaternion(jetGroup.quaternion.clone().invert());
+                        const azimuthAngle = Math.atan2(localPos.x, -localPos.z);
+                        const elevationAngle = Math.atan2(localPos.y, -localPos.z);
+
+                        if (Math.abs(azimuthAngle) <= maxRadarAngle && Math.abs(elevationAngle) <= maxRadarAngle && localPos.z < 0) {
+                            const radarX = (azimuthAngle / maxRadarAngle) * 0.5 + 0.5;
+                            const radarY = 1.0 - (dist / maxRadarRange);
+
+                            let isSwept = false;
+                            const minX = Math.min(prevRadarSweepTime, radarSweepTime);
+                            const maxX = Math.max(prevRadarSweepTime, radarSweepTime);
+                            
+                            if (radarX >= minX && radarX <= maxX) isSwept = true;
+                            if (Math.abs(radarSweepTime - radarX) < 0.05) isSwept = true;
+
+                            if (isSwept) {
+                                enemy.radarMemory = { x: radarX, y: radarY, time: now };
+                            }
+                        }
+                    }
+
+                    if (enemy.radarMemory) {
+                        const age = (now - enemy.radarMemory.time) / 1000; 
+                        if (age < 1.2) { 
+                            let isAmraamTarget = missiles.some(m => m.type === 'AIM-120' && m.target === enemy && !m.missed);
+                            if (!flight.radarTarget || flight.radarTarget === enemy || isAmraamTarget) {
+                                if (!isAcmMode) {
+                                    const blip = document.createElement('div');
+                                    blip.className = 'radar-blip';
+                                    blip.style.left = (enemy.radarMemory.x * 100) + '%';
+                                    blip.style.top = (enemy.radarMemory.y * 100) + '%';
+                                    blip.style.opacity = 1.0 - (age / 1.2); 
+                                    blip.style.zIndex = '3';
+                                    
+                                    if (isAmraamTarget) {
+                                        blip.style.width = '16px';
+                                        blip.style.height = '16px';
+                                        blip.style.background = 'transparent';
+                                        blip.style.border = '2px solid #00ffff';
+                                        blip.style.boxSizing = 'border-box';
+                                        blip.style.boxShadow = '0 0 10px #00ffff';
+                                    }
+                                    
+                                    radarBlipsEl.appendChild(blip);
+                                }
+                            }
+                        } else {
+                            enemy.radarMemory = null;
+                        }
+                    }
+                });
+            }
+
+            if (flight.lockTransitionTimer > 0) {
+                flight.lockTransitionTimer -= dt;
+                if (flight.pendingRadarTarget && !flight.pendingRadarTarget.active) {
+                    flight.lockTransitionTimer = 0;
+                    flight.pendingRadarTarget = null;
+                } else if (flight.lockTransitionTimer <= 0) {
+                    flight.radarTarget = flight.pendingRadarTarget;
+                    flight.pendingRadarTarget = null;
+                    
+                    const targetBox = document.getElementById('radar-target-box');
+                    targetBox.style.animation = 'none';
+                    void targetBox.offsetWidth;
+                    targetBox.style.animation = 'lockEngage 0.15s ease-out forwards';
+                }
+            }
+
+            const targetBox = document.getElementById('radar-target-box');
+            const targetDist = document.getElementById('radar-target-dist');
+            const targetRelSpeed = document.getElementById('radar-target-rel-speed');
+            const targetDir = document.getElementById('radar-target-dir');
+
+            if (flight.radarTarget && !flight.radarTarget.active) {
+                flight.radarTarget = null;
+            }
+
+            if (flight.radarTarget && flight.radarTarget.active) {
+                const targetWorldPos = new THREE.Vector3();
+                flight.radarTarget.mesh.getWorldPosition(targetWorldPos);
+                const toEnemy = targetWorldPos.clone().sub(jetWorldPos);
+                const dist = toEnemy.length();
+                const localPos = toEnemy.clone().applyQuaternion(jetGroup.quaternion.clone().invert());
+                const azimuthAngle = Math.atan2(localPos.x, -localPos.z);
+                const elevationAngle = Math.atan2(localPos.y, -localPos.z);
+                const maxRadarAngle = THREE.MathUtils.degToRad(70);
+                
+                if (dist > currentRadarRange || Math.abs(azimuthAngle) > maxRadarAngle || Math.abs(elevationAngle) > maxRadarAngle || localPos.z >= 0) {
+                    flight.radarTarget = null;
+                    flight.seekerActive = false; 
+                }
+            }
+
+            if (flight.radarTarget && flight.radarTarget.active) {
+                const targetWorldPos = new THREE.Vector3();
+                flight.radarTarget.mesh.getWorldPosition(targetWorldPos);
+                
+                const screenPos = targetWorldPos.clone().project(camera);
+                if (screenPos.z < 1.0 && screenPos.z > -1.0) {
+                    const pixelX = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                    const pixelY = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+                    
+                    targetBox.style.display = 'block';
+                    targetBox.style.left = pixelX + 'px';
+                    targetBox.style.top = pixelY + 'px';
+                    
+                    const distToEnemy = jetWorldPos.distanceTo(targetWorldPos);
+                    targetDist.innerText = (distToEnemy / 1000).toFixed(2) + ' km';
+
+                    const playerVel = new THREE.Vector3(0, 0, -flight.speed / 3.6).applyQuaternion(jetGroup.quaternion);
+                    const enemyVel = new THREE.Vector3(0, 0, -flight.radarTarget.speed).applyQuaternion(flight.radarTarget.mesh.quaternion);
+                    const relSpeed = playerVel.clone().sub(enemyVel).length();
+                    targetRelSpeed.innerText = relSpeed.toFixed(0) + ' m/s';
+
+                    const p1 = targetWorldPos.clone().project(camera);
+                    const p2 = targetWorldPos.clone().add(enemyVel).project(camera);
+                    const sx1 = (p1.x * 0.5 + 0.5) * window.innerWidth;
+                    const sy1 = (-p1.y * 0.5 + 0.5) * window.innerHeight;
+                    const sx2 = (p2.x * 0.5 + 0.5) * window.innerWidth;
+                    const sy2 = (-p2.y * 0.5 + 0.5) * window.innerHeight;
+                    const dx = sx2 - sx1;
+                    const dy = sy2 - sy1;
+                    let rot = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+                    targetDir.style.transform = `rotate(${rot}deg)`;
+
+                } else {
+                    targetBox.style.display = 'none';
+                }
+            } else {
+                targetBox.style.display = 'none';
+            }
+
+            let detectedEnemies = enemies.filter(e => {
+                if (!e.active || !e.radarMemory) return false;
+                const enemyWorldPos = new THREE.Vector3();
+                e.mesh.getWorldPosition(enemyWorldPos);
+                const screenPos = enemyWorldPos.clone().project(camera);
+                return screenPos.z < 1.0 && screenPos.z > -1.0 && screenPos.x > -0.9 && screenPos.x < 0.9 && screenPos.y > -0.8 && screenPos.y < 0.8;
+            });
+            detectedEnemies.sort((a, b) => jetWorldPos.distanceTo(a.mesh.position) - jetWorldPos.distanceTo(b.mesh.position));
+
+            let isSoftTargetValid = false;
+            if (flight.softTarget && flight.softTarget.active && flight.softTarget.radarMemory) {
+                const enemyWorldPos = new THREE.Vector3();
+                flight.softTarget.mesh.getWorldPosition(enemyWorldPos);
+                const screenPos = enemyWorldPos.clone().project(camera);
+                if (screenPos.z < 1.0 && screenPos.z > -1.0 && screenPos.x > -0.9 && screenPos.x < 0.9 && screenPos.y > -0.8 && screenPos.y < 0.8) {
+                    isSoftTargetValid = true;
+                }
+            }
+
+            if (!isSoftTargetValid) {
+                flight.softTarget = detectedEnemies.length > 0 ? detectedEnemies[0] : null;
+            }
+
+            const recBoxEl = document.getElementById('recommend-box');
+            const recDist = document.getElementById('rec-dist');
+            const recRelSpeed = document.getElementById('rec-rel-speed');
+            const recDir = document.getElementById('rec-dir');
+
+            let displaySoftTarget = flight.pendingRadarTarget ? flight.pendingRadarTarget : flight.softTarget;
+
+            if (displaySoftTarget && displaySoftTarget.active && !flight.radarTarget && !isAcmMode) {
+                const targetWorldPos = new THREE.Vector3();
+                displaySoftTarget.mesh.getWorldPosition(targetWorldPos);
+                
+                const screenPos = targetWorldPos.clone().project(camera);
+                if (screenPos.z < 1.0 && screenPos.z > -1.0) {
+                    const pixelX = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                    const pixelY = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+                    
+                    recBoxEl.style.display = 'block';
+                    recBoxEl.style.left = pixelX + 'px';
+                    recBoxEl.style.top = pixelY + 'px';
+                    
+                    if (flight.lockTransitionTimer > 0) {
+                        recBoxEl.style.opacity = (flight.lockTransitionTimer > 0.1) ? 0 : 1;
+                    } else {
+                        recBoxEl.style.opacity = 1;
+                    }
+                    
+                    const distToEnemy = jetWorldPos.distanceTo(targetWorldPos);
+                    recDist.innerText = (distToEnemy / 1000).toFixed(2) + ' km';
+
+                    const playerVel = new THREE.Vector3(0, 0, -flight.speed / 3.6).applyQuaternion(jetGroup.quaternion);
+                    const enemyVel = new THREE.Vector3(0, 0, -displaySoftTarget.speed).applyQuaternion(displaySoftTarget.mesh.quaternion);
+                    const relSpeed = playerVel.clone().sub(enemyVel).length();
+                    recRelSpeed.innerText = relSpeed.toFixed(0) + ' m/s';
+
+                    const p1 = targetWorldPos.clone().project(camera);
+                    const p2 = targetWorldPos.clone().add(enemyVel).project(camera);
+                    const sx1 = (p1.x * 0.5 + 0.5) * window.innerWidth;
+                    const sy1 = (-p1.y * 0.5 + 0.5) * window.innerHeight;
+                    const sx2 = (p2.x * 0.5 + 0.5) * window.innerWidth;
+                    const sy2 = (-p2.y * 0.5 + 0.5) * window.innerHeight;
+                    const dx = sx2 - sx1;
+                    const dy = sy2 - sy1;
+                    let rot = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+                    recDir.style.transform = `rotate(${rot}deg)`;
+                } else {
+                    recBoxEl.style.display = 'none';
+                }
+            } else {
+                recBoxEl.style.display = 'none';
+            }
+
+            const acmBoxEl = document.getElementById('acm-box');
+            if (isAcmMode && !isPaused && !isGameOver) {
+                acmBoxEl.style.display = 'block';
+                
+                const maxAcmAngle = THREE.MathUtils.degToRad(70);
+                const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+                const jetForwardVec = new THREE.Vector3(0, 0, -1).applyQuaternion(jetGroup.quaternion).normalize();
+                
+                let acmDir = camForward.clone();
+                const angleToCam = jetForwardVec.angleTo(camForward);
+                if (angleToCam > maxAcmAngle) {
+                    let axis = new THREE.Vector3().crossVectors(jetForwardVec, camForward).normalize();
+                    if (axis.lengthSq() < 0.001) axis.set(0, 1, 0).applyQuaternion(jetGroup.quaternion);
+                    acmDir = jetForwardVec.clone().applyAxisAngle(axis, maxAcmAngle);
+                }
+                
+                const acmTargetPos = camera.position.clone().add(acmDir.multiplyScalar(2000));
+                const acmScreenPos = acmTargetPos.project(camera);
+                
+                let acmPixelX = -9999;
+                let acmPixelY = -9999;
+                
+                if (acmScreenPos.z < 1.0 && acmScreenPos.z > -1.0) {
+                    acmPixelX = (acmScreenPos.x * 0.5 + 0.5) * window.innerWidth;
+                    acmPixelY = (-acmScreenPos.y * 0.5 + 0.5) * window.innerHeight;
+                }
+                
+                acmBoxEl.style.left = acmPixelX + 'px';
+                acmBoxEl.style.top = acmPixelY + 'px';
+
+                if (!flight.radarTarget || !flight.radarTarget.active) {
+                    for (let j = 0; j < enemies.length; j++) {
+                        const enemy = enemies[j];
+                        if (!enemy.active) continue;
+                        
+                        const enemyWorldPos = new THREE.Vector3();
+                        enemy.mesh.getWorldPosition(enemyWorldPos);
+                        const distToEnemy = jetWorldPos.distanceTo(enemyWorldPos);
+                        
+                        if (distToEnemy <= 72000) {
+                            const screenPos = enemyWorldPos.clone().project(camera);
+                            if (screenPos.z < 1.0 && screenPos.z > -1.0) {
+                                const pixelX = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                                const pixelY = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+                                
+                                const boxSize = 48 / 2; 
+                                
+                                if (Math.abs(pixelX - acmPixelX) < boxSize && Math.abs(pixelY - acmPixelY) < boxSize) {
+                                    flight.radarTarget = enemy; 
+                                    isAcmMode = false; 
+                                    const targetBox = document.getElementById('radar-target-box');
+                                    targetBox.style.animation = 'none';
+                                    void targetBox.offsetWidth;
+                                    targetBox.style.animation = 'lockEngage 0.15s ease-out forwards';
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    isAcmMode = false;
+                }
+            } else {
+                acmBoxEl.style.display = 'none';
+            }
+
             renderer.render(scene, camera);
         }
         animate();
