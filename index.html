@@ -477,7 +477,7 @@
             <span class="value"><span id="speed">700</span> <span class="unit">km/h</span></span>
         </div>
         <div class="stat-row"><span class="label">마하 수</span><span class="value" id="mach">0.57</span></div>
-        <div class="stat-row"><span class="label">고도</span><span class="value"><span id="alt">200</span> <span class="unit">m</span></span></div>
+        <div class="stat-row"><span class="label">고도</span><span class="value"><span id="alt">1000</span> <span class="unit">m</span></span></div>
         
         <div style="height: 15px;"></div>
         
@@ -672,7 +672,7 @@
         
         let flight = { 
             speed: 700, throttle: 100, fuelTime: INITIAL_FUEL_TIME, fuelPct: 100, prevThrottle: 100,
-            altitude: 200, roll: 0, pitch: 0, yaw: 0, autoBank: 0, 
+            altitude: 1000, roll: 0, pitch: 0, yaw: 0, autoBank: 0, 
             abIntensity: 0, boomTime: 0, wasSupersonic: false, explosionSize: 0,
             totalDist: 0, camDist: 38, reticleX: 0, reticleY: 0, freeCamYaw: 0, freeCamPitch: 0,
             unlimitedFuel: false, 
@@ -693,8 +693,8 @@
         };
 
         // --- 커스텀 무장 시스템 변수 및 함수 ---
-        let weaponLoadout = [null, null, 'AIM-9X', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-9X', null, null];
-        let currentWeaponType = 'AIM-9X';
+        let weaponLoadout = [null, null, 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', null, null];
+        let currentWeaponType = 'AIM-120D';
 
         function updateHUDMissile() {
             let count = weaponLoadout.filter(w => w === currentWeaponType).length;
@@ -789,9 +789,9 @@
             flight.unlimitedMissile = document.getElementById('unlimited-missile').checked; 
             if (flight.unlimitedMissile) {
                 if (selectedJetType === 'F-16') {
-                    weaponLoadout = [null, null, 'AIM-9X', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-9X', null, null];
+                    weaponLoadout = [null, null, 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', null, null];
                 } else {
-                    weaponLoadout = ['AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D'];
+                    weaponLoadout = [null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null];
                 }
                 updateHUDMissile();
                 if (typeof mountedMissiles !== 'undefined') {
@@ -837,45 +837,77 @@
         function populateLand() {
             const treeGeo = new THREE.ConeGeometry(20, 60, 8);
             const treeMat = new THREE.MeshLambertMaterial({ color: 0x113311 });
-            const hillMat = new THREE.MeshLambertMaterial({ color: 0x2b4a24 });
+            const hillMat = new THREE.MeshLambertMaterial({ color: 0x335533 });
 
             // 산은 조금씩 (50개)
             for(let i=0; i<50; i++) {
                 const x = (Math.random() - 0.5) * landSize;
                 const z = (Math.random() - 0.5) * landSize;
-                const s = 300 + Math.random() * 800;
+                const s = 400 + Math.random() * 1000;
                 const h = s * 1.2;
-                const mt = new THREE.Mesh(new THREE.ConeGeometry(s, h, 4), new THREE.MeshLambertMaterial({color: 0x444444}));
+                const mt = new THREE.Mesh(new THREE.ConeGeometry(s, h, 16), new THREE.MeshLambertMaterial({color: 0x444444}));
                 mt.position.set(x, h/2, z);
                 landGroup.add(mt);
-                colliders.push({ x, z, radius: s * 0.7, height: h });
-                mountainColliders.push({ x, z, radius: s, height: h });
+                colliders.push({ x, z, radius: s, height: h, type: 'cone' });
+                mountainColliders.push({ x, z, radius: s, height: h, type: 'cone' });
             }
 
-            // 언덕진 맵 (언덕 많이 배치, 800개)
-            for(let i=0; i<800; i++) {
+            // 언덕진 맵 (언덕 많이 배치, 여러 도형 섞기, 부드럽게 겹침)
+            for(let i=0; i<1000; i++) {
                 const x = (Math.random() - 0.5) * landSize;
                 const z = (Math.random() - 0.5) * landSize;
-                const s = 800 + Math.random() * 2000;
+                const s = 1500 + Math.random() * 2500; 
                 const h = 200 + Math.random() * 400;
-                const hill = new THREE.Mesh(new THREE.ConeGeometry(s, h, 8), hillMat);
-                hill.position.set(x, h/2, z);
-                landGroup.add(hill);
-                colliders.push({ x, z, radius: s * 0.7, height: h });
-                mountainColliders.push({ x, z, radius: s, height: h });
+                
+                const r = Math.random();
+                let typeStr = '';
+                
+                if (r < 0.4) {
+                    const hill = new THREE.Mesh(new THREE.SphereGeometry(s, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), hillMat);
+                    hill.scale.y = h / s;
+                    hill.position.set(x, -h * 0.1, z); // 살짝 가라앉혀서 부드럽게
+                    landGroup.add(hill);
+                    typeStr = 'dome';
+                } else if (r < 0.7) {
+                    const hill = new THREE.Mesh(new THREE.ConeGeometry(s, h, 32), hillMat);
+                    hill.position.set(x, h/2 - h*0.1, z);
+                    landGroup.add(hill);
+                    typeStr = 'cone';
+                } else {
+                    const hill = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.3, s, h, 32), hillMat);
+                    hill.position.set(x, h/2 - h*0.1, z);
+                    landGroup.add(hill);
+                    typeStr = 'plateau';
+                }
+                
+                colliders.push({ x, z, radius: s, height: h * 0.9, type: typeStr });
+                mountainColliders.push({ x, z, radius: s, height: h * 0.9, type: typeStr });
             }
 
             // 나무 듬성듬성 (1000개)
             for(let i=0; i<1000; i++) {
                 const x = (Math.random() - 0.5) * landSize;
                 const z = (Math.random() - 0.5) * landSize;
+                
+                let highestY = 5;
+                for (let mt of mountainColliders) {
+                    const d = Math.sqrt((x - mt.x)**2 + (z - mt.z)**2);
+                    if (d < mt.radius) {
+                        let y = 0;
+                        if (mt.type === 'dome') y = mt.height * Math.sqrt(1 - (d/mt.radius)**2);
+                        else if (mt.type === 'cone') y = mt.height * (1 - d/mt.radius);
+                        else if (mt.type === 'plateau') y = d < mt.radius*0.3 ? mt.height : mt.height * (1 - (d - mt.radius*0.3)/(mt.radius*0.7));
+                        if (y > highestY) highestY = y;
+                    }
+                }
+                
                 const tree = new THREE.Mesh(treeGeo, treeMat);
-                tree.position.set(x, 30, z);
+                tree.position.set(x, highestY + 30, z);
                 landGroup.add(tree);
-                colliders.push({ x, z, radius: 10, height: 60 });
+                colliders.push({ x, z, radius: 20, height: highestY + 60, type: 'cone' });
             }
 
-            // 잔디 듬성듬성 (기존 20만개에서 5만개로 축소)
+            // 잔디 듬성듬성 (5만개)
             const grassCount = 50000;
             const grassGeo = new THREE.ConeGeometry(4, 10, 3);
             const grassMat = new THREE.MeshLambertMaterial({ color: 0x2d5a27 });
@@ -886,14 +918,19 @@
                 const x = (Math.random() - 0.5) * landSize;
                 const z = (Math.random() - 0.5) * landSize;
 
-                let isInsideMountain = false;
+                let highestY = 5;
                 for (let mt of mountainColliders) {
-                    const dx = x - mt.x; const dz = z - mt.z;
-                    if (Math.sqrt(dx*dx + dz*dz) < mt.radius) { isInsideMountain = true; break; }
+                    const d = Math.sqrt((x - mt.x)**2 + (z - mt.z)**2);
+                    if (d < mt.radius) {
+                        let y = 0;
+                        if (mt.type === 'dome') y = mt.height * Math.sqrt(1 - (d/mt.radius)**2);
+                        else if (mt.type === 'cone') y = mt.height * (1 - d/mt.radius);
+                        else if (mt.type === 'plateau') y = d < mt.radius*0.3 ? mt.height : mt.height * (1 - (d - mt.radius*0.3)/(mt.radius*0.7));
+                        if (y > highestY) highestY = y;
+                    }
                 }
-                if (isInsideMountain) { i--; continue; } 
 
-                dummy.position.set(x, 5, z);
+                dummy.position.set(x, highestY, z);
                 dummy.rotation.y = Math.random() * Math.PI;
                 dummy.updateMatrix();
                 instancedGrass.setMatrixAt(i, dummy.matrix);
@@ -901,6 +938,7 @@
             landGroup.add(instancedGrass);
         }
         populateLand();
+        
         scene.add(landGroup);
 
         const jetGroup = new THREE.Group();
@@ -1038,6 +1076,15 @@
         const f15VStabL = f15VStabR.clone(); f15VStabL.position.x = -1.4;
         f15Model.add(f15VStabL);
 
+        // F-15 엔진 노즐 2개 추가
+        const f15EngineNozzleR = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.5, 16), darkMat);
+        f15EngineNozzleR.rotation.x = Math.PI / 2;
+        f15EngineNozzleR.position.set(1.0, -0.1, 8.2);
+        f15Model.add(f15EngineNozzleR);
+        const f15EngineNozzleL = f15EngineNozzleR.clone();
+        f15EngineNozzleL.position.x = -1.0;
+        f15Model.add(f15EngineNozzleL);
+
         // --- 공용 무장 파일런 (초기값은 축소된 F-16 비율에 맞춤, 기체 변경시 보정됨) ---
         const pylonR = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.28, 3.192), darkMat);
         pylonR.position.set(6.4, -0.2, 2.834);
@@ -1115,16 +1162,14 @@
             8: new THREE.Vector3(6.65, -0.2, 3.0)
         };
         const missileStationsF15 = {
-            0: new THREE.Vector3(-1.6, -0.5, -1.0),
-            1: new THREE.Vector3( 1.6, -0.5, -1.0),
-            2: new THREE.Vector3(-1.6, -0.5,  2.0),
-            3: new THREE.Vector3( 1.6, -0.5,  2.0),
-            4: new THREE.Vector3(-4.4, -1.2,  0.5),
-            6: new THREE.Vector3(-4.8, -0.9,  0.5),
-            7: new THREE.Vector3(-4.0, -0.9,  0.5),
-            8: new THREE.Vector3( 4.4, -1.2,  0.5),
-            9: new THREE.Vector3( 4.8, -0.9,  0.5),
-            10: new THREE.Vector3( 4.0, -0.9,  0.5)
+            1: new THREE.Vector3(-4.4, -1.2,  0.5),
+            2: new THREE.Vector3(-4.0, -0.9,  0.5),
+            3: new THREE.Vector3(-1.6, -0.5, -1.0),
+            4: new THREE.Vector3(-1.6, -0.5,  2.0),
+            6: new THREE.Vector3( 1.6, -0.5,  2.0),
+            7: new THREE.Vector3( 1.6, -0.5, -1.0),
+            8: new THREE.Vector3( 4.0, -0.9,  0.5),
+            9: new THREE.Vector3( 4.4, -1.2,  0.5)
         };
         
         let missileStations = missileStationsF16;
@@ -1172,8 +1217,8 @@
                 pylonOutR.position.set(5.04, -0.55, 2.0);
                 pylonOutL.position.set(-5.04, -0.55, 2.0);
 
-                weaponLoadout = [null, null, 'AIM-9X', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-9X', null, null];
-                currentWeaponType = 'AIM-9X';
+                weaponLoadout = [null, null, 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', null, null];
+                currentWeaponType = 'AIM-120D';
                 missileStations = missileStationsF16;
             } else {
                 document.getElementById('card-f15').classList.add('selected');
@@ -1190,7 +1235,7 @@
                 pylonOutR.position.set(6.0, -0.55, 1.5);
                 pylonOutL.position.set(-6.0, -0.55, 1.5);
 
-                weaponLoadout = ['AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D'];
+                weaponLoadout = [null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null];
                 currentWeaponType = 'AIM-120D';
                 missileStations = missileStationsF15;
             }
@@ -1541,7 +1586,7 @@
                 const distSq = (cx - mt.x)**2 + (cz - mt.z)**2;
                 if (distSq < mt.radius * mt.radius) {
                     const cy = p1y + t * dy;
-                    const coneHeight = mt.height * (1 - Math.sqrt(distSq) / mt.radius);
+                    const coneHeight = mt.type === 'dome' ? mt.height * Math.sqrt(1 - distSq / (mt.radius * mt.radius)) : mt.height * (1 - Math.sqrt(distSq) / mt.radius);
                     if (cy < coneHeight) return false;
                 }
             }
@@ -1876,7 +1921,8 @@
                 const mMapX = m.mesh.position.x - landGroup.position.x;
                 const mMapZ = m.mesh.position.z - landGroup.position.z;
                 for (let c of colliders) {
-                    if (Math.sqrt((mMapX - c.x)**2 + (mMapZ - c.z)**2) < c.radius && m.mesh.position.y < c.height) {
+                    let d = Math.sqrt((mMapX - c.x)**2 + (mMapZ - c.z)**2);
+                    if (d < c.radius && m.mesh.position.y < c.height * (1 - d / c.radius)) {
                         hitTerrain = true; 
                         break;
                     }
@@ -1930,9 +1976,10 @@
             }
 
             if (killMsgTimer > 0) { killMsgTimer -= dt; if (killMsgTimer <= 0) killMsgEl.style.display = 'none'; }
+            
             if (flight.altitude <= 5) triggerGameOver();
             const jetX = -landGroup.position.x, jetZ = -landGroup.position.z;
-            for (let c of colliders) { if (Math.sqrt((jetX - c.x)**2 + (jetZ - c.z)**2) < c.radius && flight.altitude < c.height) { triggerGameOver(); break; } }
+            for (let c of colliders) { let d = Math.sqrt((jetX - c.x)**2 + (jetZ - c.z)**2); if (d < c.radius && flight.altitude < c.height * (1 - d / c.radius)) { triggerGameOver(); break; } }
 
             if (keys.u && trackingMissile) {
                 const mVelDir = trackingMissile.velocity.clone().normalize();
