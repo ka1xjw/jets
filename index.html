@@ -8,8 +8,8 @@
         body { margin: 0; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; color: #ffffff; background-color: #000; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
         
-        #hud { position: absolute; top: 30px; left: 30px; z-index: 10; pointer-events: none; }
-        .stat-row { display: flex; align-items: baseline; width: 350px; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9); }
+        #hud { position: absolute; top: 30px; left: 30px; z-index: 10; pointer-events: none; color: #ffffff; }
+        .stat-row { display: flex; align-items: baseline; width: 350px; margin-bottom: 8px; text-shadow: 0 0 5px #000000; }
         .label { width: 100px; font-size: 1.1rem; font-weight: 700; opacity: 0.9; }
         .value { flex: 1; font-size: 1.3rem; text-align: right; font-variant-numeric: tabular-nums; }
         .unit { font-size: 0.8rem; margin-left: 5px; opacity: 0.7; }
@@ -43,7 +43,8 @@
         }
 
         #distance-hud { position: absolute; top: 20px; right: 20px; z-index: 10; color: #000; font-size: 0.9rem; font-weight: bold; background: rgba(255, 255, 255, 0.6); padding: 5px 10px; border-radius: 5px; }
-        #reticle { position: absolute; width: 30px; height: 30px; border: 2px solid rgba(200, 200, 200, 0.6); border-radius: 50%; pointer-events: none; z-index: 50; transform: translate(-50%, -50%); display: none; }
+        #reticle { position: absolute; width: 30px; height: 30px; border: 2.2px solid #ffffff; border-radius: 50%; pointer-events: none; z-index: 50; transform: translate(-50%, -50%); display: none; }
+        #gun-reticle { position: absolute; width: 10px; height: 10px; border: 2px solid #ffffff; border-radius: 50%; pointer-events: none; z-index: 51; transform: translate(-50%, -50%); display: none; box-shadow: 0 0 3px #000; }
         
         #overlay, #game-over { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; }
         .menu-btns { display: flex; gap: 20px; margin-top: 30px; }
@@ -145,7 +146,7 @@
             100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
         }
 
-        /* --- 레이더 타겟 박스 CSS (완전한 정사각형으로 수정) --- */
+        /* --- 레이더 타겟 박스 초점(완전한 정사각형으로 수정) --- */
         #radar-target-box {
             position: absolute;
             width: 48px;
@@ -321,6 +322,7 @@
 <body oncontextmenu="return false;">
 
     <div id="reticle"></div>
+    <div id="gun-reticle"></div>
     
     <!-- 레이더 타겟 박스 및 추천 박스, ACM 박스 HTML -->
     <div id="radar-target-box">
@@ -458,24 +460,27 @@
             <span class="label">스로틀</span>
             <span class="value"><span id="throttle">100</span><span class="unit">%</span><span id="wep-text">(WEP)</span></span>
         </div>
-        <div class="stat-row" id="fuel-row">
-            <span class="label">연료</span>
-            <span class="value" id="fuel-display">42:16, (100.0%)</span>
-        </div>
         <div class="stat-row" id="speed-row">
             <span class="label">속도</span>
             <span class="value"><span id="speed">700</span> <span class="unit">km/h</span></span>
         </div>
-        <div class="stat-row" id="ammo-row">
-            <span class="label">기총</span>
-            <span class="value"><span id="ammo">512</span></span>
-        </div>
+        <div class="stat-row"><span class="label">마하 수</span><span class="value" id="mach">0.57</span></div>
+        <div class="stat-row"><span class="label">고도</span><span class="value"><span id="alt">200</span> <span class="unit">m</span></span></div>
+        
+        <div style="height: 15px;"></div>
+        
         <div class="stat-row" id="missile-row">
             <span class="label">AIM-9X</span>
             <span class="value" id="missile-count">( 6 )</span>
         </div>
-        <div class="stat-row"><span class="label">마하</span><span class="value" id="mach">0.57</span></div>
-        <div class="stat-row"><span class="label">고도</span><span class="value"><span id="alt">200</span> <span class="unit">m</span></span></div>
+        <div class="stat-row" id="ammo-row">
+            <span class="label">기관포</span>
+            <span class="value"><span id="ammo">512</span></span>
+        </div>
+        <div class="stat-row" id="fuel-row">
+            <span class="label">연료</span>
+            <span class="value" id="fuel-display">42:16, (100.0%)</span>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -536,7 +541,7 @@
         let nextMissileLeft = false;
 
         const missileGeo = new THREE.Group();
-        const mBody = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.5, 8).rotateX(-Math.PI/2), new THREE.MeshStandardMaterial({color: 0xdddddd}));
+        const mBody = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.5, 8).rotateX(Math.PI/2), new THREE.MeshStandardMaterial({color: 0xdddddd}));
         const mNose = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.5, 8).rotateX(-Math.PI/2), new THREE.MeshStandardMaterial({color: 0x444444}));
         mNose.position.z = -1.5;
         const mFin = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.02, 0.4), new THREE.MeshStandardMaterial({color: 0x222222}));
@@ -630,7 +635,7 @@
         }
 
         const keys = { w:false, s:false, a:false, d:false, shift:false, c:false, u:false };
-        const overlay = document.getElementById('overlay'), gameoverUI = document.getElementById('game-over'), reticleEl = document.getElementById('reticle');
+        const overlay = document.getElementById('overlay'), gameoverUI = document.getElementById('game-over'), reticleEl = document.getElementById('reticle'), gunReticleEl = document.getElementById('gun-reticle');
         const warningMsg = document.getElementById('warning-msg');
 
         let currentHelpPage = 1;
@@ -665,6 +670,11 @@
             if (flight.unlimitedMissile) {
                 weaponLoadout = [null, null, 'AIM-9X', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-9X', null, null];
                 updateHUDMissile();
+                if (typeof mountedMissiles !== 'undefined') {
+                    for (let idx in mountedMissiles) {
+                        if (mountedMissiles[idx]) mountedMissiles[idx].visible = true;
+                    }
+                }
             }
             flight.accMult = document.getElementById('acc-multiplier').checked ? 10 : 1;
             flight.speedMult = document.getElementById('speed-multiplier').checked ? 10 : 1;
@@ -779,11 +789,23 @@
         const wingL = wingR.clone(); wingL.scale.x = -1; wingL.position.x = -1.2;
         jetGroup.add(wingL);
 
-        const pylonR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 3.8), darkMat);
-        pylonR.position.set(7.7, -0.2, 2.0);
+        const pylonR = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.28, 2.66), darkMat);
+        pylonR.position.set(7.7, -0.2, 3.1);
         jetGroup.add(pylonR);
         const pylonL = pylonR.clone(); pylonL.position.x = -7.7;
         jetGroup.add(pylonL);
+
+        const pylonInR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 3.5), darkMat);
+        pylonInR.position.set(4.4, -0.6, 0.5); 
+        jetGroup.add(pylonInR);
+        const pylonInL = pylonInR.clone(); pylonInL.position.x = -4.4; 
+        jetGroup.add(pylonInL);
+        
+        const pylonOutR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 3.0), darkMat);
+        pylonOutR.position.set(6.0, -0.55, 1.5); 
+        jetGroup.add(pylonOutR);
+        const pylonOutL = pylonOutR.clone(); pylonOutL.position.x = -6.0; 
+        jetGroup.add(pylonOutL);
 
         const hStabShape = new THREE.Shape(); hStabShape.moveTo(0,0); hStabShape.lineTo(3.5, 3.5); hStabShape.lineTo(0, 3.5);
         const hStabR = new THREE.Mesh(new THREE.ExtrudeGeometry(hStabShape, { depth: 0.1, bevelEnabled: false }), paintMat);
@@ -844,6 +866,27 @@
         const explosion = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0 }));
         scene.add(explosion);
 
+        const missileStations = {
+            2: new THREE.Vector3(-7.9, -0.2, 3.1),
+            3: new THREE.Vector3(-6.0, -0.85, 1.5),
+            4: new THREE.Vector3(-4.4, -0.95, 0.5),
+            6: new THREE.Vector3(4.4, -0.95, 0.5),
+            7: new THREE.Vector3(6.0, -0.85, 1.5),
+            8: new THREE.Vector3(7.9, -0.2, 3.1)
+        };
+        const mountedMissiles = {};
+        for (let idx in missileStations) {
+            let mType = weaponLoadout[idx];
+            if (mType) {
+                let mMesh = missileGeo.clone();
+                if (mType === 'AIM-120D') mMesh.scale.set(1.2, 1.2, 1.5);
+                else mMesh.scale.set(0.9, 0.9, 0.9);
+                mMesh.position.copy(missileStations[idx]);
+                jetGroup.add(mMesh);
+                mountedMissiles[idx] = mMesh;
+            }
+        }
+
         function spawnEnemies() {
             const enemyMat = new THREE.MeshStandardMaterial({ color: 0x773333, roughness: 0.5, metalness: 0.4 });
             const eGroup = new THREE.Group();
@@ -895,11 +938,43 @@
         updateHUDMissile(); 
 
         function fireMissile() {
-            const m = missileGeo.clone();
-            const xOffset = nextMissileLeft ? -5.25 : 5.25;
-            nextMissileLeft = !nextMissileLeft;
+            let order = [0, 10, 1, 9, 2, 8, 3, 7, 4, 6, 5];
+            let firedIndex = -1;
             
-            const offset = new THREE.Vector3(xOffset, -0.3, -1.5).applyQuaternion(jetGroup.quaternion);
+            for(let i of order) {
+                if (weaponLoadout[i] === currentWeaponType && mountedMissiles[i] && mountedMissiles[i].visible) {
+                    firedIndex = i;
+                    break;
+                }
+            }
+            
+            if (firedIndex === -1 && flight.unlimitedMissile) {
+                for(let i of order) {
+                    if (weaponLoadout[i] === currentWeaponType && mountedMissiles[i]) mountedMissiles[i].visible = true;
+                }
+                for(let i of order) {
+                    if (weaponLoadout[i] === currentWeaponType && mountedMissiles[i] && mountedMissiles[i].visible) {
+                        firedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            let launchPosLocal = new THREE.Vector3(0, -0.3, -1.5);
+            if (firedIndex !== -1 && missileStations[firedIndex]) {
+                launchPosLocal.copy(missileStations[firedIndex]);
+                mountedMissiles[firedIndex].visible = false;
+            } else {
+                const xOffset = nextMissileLeft ? -6.0 : 6.0;
+                nextMissileLeft = !nextMissileLeft;
+                launchPosLocal.set(xOffset, -0.3, -1.5);
+            }
+
+            const m = missileGeo.clone();
+            if (currentWeaponType === 'AIM-120D') m.scale.set(1.2, 1.2, 1.5);
+            else m.scale.set(0.9, 0.9, 0.9);
+            
+            const offset = launchPosLocal.applyQuaternion(jetGroup.quaternion);
             m.position.copy(jetGroup.position).add(offset);
             m.quaternion.copy(jetGroup.quaternion); 
             scene.add(m);
@@ -938,6 +1013,7 @@
             isPaused = (document.pointerLockElement !== renderer.domElement); 
             overlay.style.display = isPaused ? 'flex' : 'none'; 
             reticleEl.style.display = isPaused ? 'none' : 'block'; 
+            gunReticleEl.style.display = isPaused ? 'none' : 'block'; 
         });
         
         document.getElementById('radar-ui').addEventListener('mousedown', function(e) {
@@ -1108,10 +1184,10 @@
             else {
                 flight.reticleX += e.movementX; 
                 flight.reticleY += e.movementY;
-                const maxR = Math.min(window.innerWidth, window.innerHeight) * 0.45;
-                const rDist = Math.sqrt(flight.reticleX**2 + flight.reticleY**2);
-                if(rDist > maxR) { flight.reticleX = (flight.reticleX/rDist)*maxR; flight.reticleY = (flight.reticleY/rDist)*maxR; }
-                flight.autoBank = THREE.MathUtils.lerp(flight.autoBank, e.movementX * 0.05, 0.2);
+                let halfW = window.innerWidth / 2 - 15;
+                let halfH = window.innerHeight / 2 - 15;
+                flight.reticleX = Math.max(-halfW, Math.min(halfW, flight.reticleX));
+                flight.reticleY = Math.max(-halfH, Math.min(halfH, flight.reticleY));
             }
         });
 
@@ -1177,9 +1253,19 @@
             }
 
             if (!isAltHeld) {
-                if (keys.a) flight.roll -= 5.5 * dt; else if (keys.d) flight.roll += 5.5 * dt;
-                else { let diff = (flight.autoBank - flight.roll) % (Math.PI * 2); if (diff < -Math.PI) diff += Math.PI * 2; if (diff > Math.PI) diff -= Math.PI * 2; flight.roll += diff * 4.0 * dt; }
-                flight.autoBank *= (1 - 5.0 * dt);
+                let normX = flight.reticleX / (window.innerWidth / 2);
+                flight.autoBank = normX * 1.5; 
+                if (keys.a) { flight.roll -= 5.5 * dt; } 
+                else if (keys.d) { flight.roll += 5.5 * dt; }
+                else { 
+                    let diff = (flight.autoBank - flight.roll) % (Math.PI * 2); 
+                    if (diff < -Math.PI) diff += Math.PI * 2; if (diff > Math.PI) diff -= Math.PI * 2; 
+                    
+                    let maneuverStrength = Math.min(Math.abs(normX) * 3.0, 1.0); 
+                    let recoverySpeed = 0.64 + maneuverStrength * 5.76; 
+                    
+                    flight.roll += diff * recoverySpeed * dt; 
+                }
             }
 
             jetGroup.rotation.set(0, 0, 0); jetGroup.rotateY(flight.yaw); jetGroup.rotateX(flight.pitch); jetGroup.rotateZ(-flight.roll);
@@ -1251,7 +1337,7 @@
                 lastFireTime = now;
                 if (!flight.unlimitedAmmo) flight.ammo--; 
                 const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-                const noseOffset = new THREE.Vector3(0, 0, -9).applyQuaternion(moveQuat);
+                const noseOffset = new THREE.Vector3(0, -1.5, -9).applyQuaternion(moveQuat);
                 bullet.position.copy(jetGroup.position).add(noseOffset);
                 bullet.quaternion.copy(moveQuat);
                 const bulletVelocity = speedMs + 1000;
@@ -1613,7 +1699,10 @@
 
             document.getElementById('throttle').innerText = Math.floor(flight.throttle);
             document.getElementById('speed').innerText = Math.floor(flight.speed).toLocaleString();
+            
             document.getElementById('mach').innerText = currentMach.toFixed(2);
+            document.getElementById('mach').parentNode.style.display = currentMach >= 0.7 ? 'flex' : 'none';
+
             document.getElementById('alt').innerText = Math.floor(flight.altitude).toLocaleString();
             document.getElementById('dist-val').innerText = flight.totalDist.toFixed(2);
             document.getElementById('ammo').innerText = flight.unlimitedAmmo ? "무제한" : flight.ammo;
@@ -1631,9 +1720,13 @@
             
             if(!flight.unlimitedFuel && flight.fuelPct < 20) document.getElementById('fuel-row').classList.add('fuel-low'); else document.getElementById('fuel-row').classList.remove('fuel-low');
             
-            let turnFactor = 3.0 * dt; 
-            let deltaYaw = flight.reticleX * 0.001 * turnFactor;
-            let deltaPitch = flight.reticleY * 0.001 * turnFactor;
+            let turnFactor = 3.0 * dt * (700 / Math.max(700, flight.speed)); 
+            
+            let normXForTurn = flight.reticleX / (window.innerWidth / 2);
+            let normYForTurn = flight.reticleY / (window.innerHeight / 2);
+            
+            let deltaYaw = normXForTurn * 0.55 * turnFactor;
+            let deltaPitch = normYForTurn * 0.55 * turnFactor;
             
             let oldPitch = flight.pitch;
             flight.yaw -= deltaYaw;
@@ -1641,21 +1734,42 @@
             flight.pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, flight.pitch));
             let actualDeltaPitch = oldPitch - flight.pitch;
             
+            let maneuverDrag = (Math.abs(deltaYaw) * 2000 + (deltaPitch < 0 ? Math.abs(deltaPitch) * 3000 : 0)) * dt;
+            flight.speed = Math.max(200, flight.speed - maneuverDrag);
+            
             let fovRad = camera.fov * Math.PI / 180;
             let pixelsPerRad = window.innerHeight / fovRad;
             
             flight.reticleX -= deltaYaw * pixelsPerRad;
             flight.reticleY -= actualDeltaPitch * pixelsPerRad;
             
-            const maxR = Math.min(window.innerWidth, window.innerHeight) * 0.45;
-            const rDist = Math.sqrt(flight.reticleX**2 + flight.reticleY**2);
-            if(rDist > maxR) { 
-                flight.reticleX = (flight.reticleX/rDist)*maxR; 
-                flight.reticleY = (flight.reticleY/rDist)*maxR; 
+            let halfW = window.innerWidth / 2 - 15;
+            let halfH = window.innerHeight / 2 - 15;
+            flight.reticleX = Math.max(-halfW, Math.min(halfW, flight.reticleX));
+            flight.reticleY = Math.max(-halfH, Math.min(halfH, flight.reticleY));
+            
+            let reticleYaw = -flight.reticleX / pixelsPerRad;
+            let reticlePitch = -flight.reticleY / pixelsPerRad;
+            const reticleQuat = moveQuat.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(reticlePitch, reticleYaw, 0, 'YXZ')));
+            const reticleAimPoint = new THREE.Vector3(0, 0, -2000).applyQuaternion(reticleQuat).add(jetGroup.position);
+            const reticleScreen = reticleAimPoint.project(camera);
+            if (reticleScreen.z < 1.0 && reticleScreen.z > -1.0) {
+                reticleEl.style.display = 'block';
+                reticleEl.style.left = (reticleScreen.x * 0.5 + 0.5) * window.innerWidth + 'px';
+                reticleEl.style.top = (-reticleScreen.y * 0.5 + 0.5) * window.innerHeight + 'px';
+            } else {
+                reticleEl.style.display = 'none';
             }
             
-            reticleEl.style.left = (window.innerWidth / 2 + flight.reticleX) + 'px'; 
-            reticleEl.style.top = (window.innerHeight / 2 + flight.reticleY) + 'px';
+            const aimPoint = new THREE.Vector3(0, 0, -2000).applyQuaternion(moveQuat).add(jetGroup.position);
+            const aimScreen = aimPoint.project(camera);
+            if (aimScreen.z < 1.0 && aimScreen.z > -1.0) {
+                gunReticleEl.style.display = 'block';
+                gunReticleEl.style.left = (aimScreen.x * 0.5 + 0.5) * window.innerWidth + 'px';
+                gunReticleEl.style.top = (-aimScreen.y * 0.5 + 0.5) * window.innerHeight + 'px';
+            } else {
+                gunReticleEl.style.display = 'none';
+            }
 
             const radarUi = document.getElementById('radar-ui');
             if (isGameOver || isPaused) {
@@ -1687,13 +1801,16 @@
                 const maxRadarRange = currentRadarRange; 
                 const maxRadarAngle = THREE.MathUtils.degToRad(70); 
 
+                const radarQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(flight.pitch, flight.yaw, 0, 'YXZ'));
+                const invRadarQuat = radarQuat.clone().invert();
+
                 let svgLines = `<svg width="100%" height="100%" style="position:absolute; top:0; left:0; pointer-events:none; z-index:1;">`;
                 missiles.forEach(m => {
                     if (m.type === 'AIM-120D') {
                         const getRadarPos = (worldPos) => {
                             const toPos = worldPos.clone().sub(jetWorldPos);
                             const dist = toPos.length();
-                            const localPos = toPos.clone().applyQuaternion(jetGroup.quaternion.clone().invert());
+                            const localPos = toPos.clone().applyQuaternion(invRadarQuat);
                             const azimuthAngle = Math.atan2(localPos.x, -localPos.z);
                             if (localPos.z >= 0) return null; 
                             const radarX = (azimuthAngle / maxRadarAngle) * 0.5 + 0.5;
@@ -1725,7 +1842,7 @@
                     const dist = toEnemy.length();
 
                     if (dist <= maxRadarRange) {
-                        const localPos = toEnemy.clone().applyQuaternion(jetGroup.quaternion.clone().invert());
+                        const localPos = toEnemy.clone().applyQuaternion(invRadarQuat);
                         const azimuthAngle = Math.atan2(localPos.x, -localPos.z);
                         const elevationAngle = Math.atan2(localPos.y, -localPos.z);
 
@@ -1760,7 +1877,7 @@
                                     blip.style.zIndex = '3';
                                     
                                     const enemyVel = new THREE.Vector3(0, 0, -enemy.speed).applyQuaternion(enemy.mesh.quaternion);
-                                    const localEnemyVel = enemyVel.clone().applyQuaternion(jetGroup.quaternion.clone().invert());
+                                    const localEnemyVel = enemyVel.clone().applyQuaternion(invRadarQuat);
                                     let radarRot = Math.atan2(localEnemyVel.z, localEnemyVel.x) * 180 / Math.PI + 90;
                                     
                                     const arrow = document.createElement('div');
