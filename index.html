@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>F-16 조종 연습 시뮬레이션</title>
+    <title>전투기 조종 연습 시뮬레이션</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700&display=swap');
         body { margin: 0; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; color: #ffffff; background-color: #000; }
@@ -50,6 +50,11 @@
         .menu-btns { display: flex; gap: 20px; margin-top: 30px; }
         button { padding: 15px 40px; font-size: 1.2rem; font-family: 'Noto Sans KR'; font-weight: bold; cursor: pointer; background: #fff; border: none; border-radius: 10px; transition: 0.2s; color: #000; }
         button:hover { background: #7c8792; color: #fff; transform: scale(1.05); }
+
+        /* 기체 선택 카드 UI CSS 추가 */
+        .jet-card { padding: 15px 30px; font-size: 1.5rem; font-weight: bold; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 10px; cursor: pointer; transition: 0.2s; }
+        .jet-card:hover { background: rgba(255,255,255,0.3); }
+        .jet-card.selected { border-color: #00ffff; background: rgba(0, 255, 255, 0.2); box-shadow: 0 0 15px rgba(0, 255, 255, 0.5); }
 
         #settings-panel { display: none; background: rgba(255, 255, 255, 0.1); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); margin-top: 20px; }
         #help-panel { display: none; background: rgba(0, 20, 30, 0.95); padding: 30px; border-radius: 20px; border: 1px solid rgba(0, 255, 255, 0.3); margin-top: 20px; text-align: left; width: 600px; max-height: 80vh; overflow-y: auto; }
@@ -179,7 +184,7 @@
             white-space: nowrap;
         }
         
-        /* --- 방향 화살표 디자인을 회전형 선과 점으로 교체 --- */
+        /* --- 방향 화살표 디자인을 회전형 선과 점 교체 --- */
         #radar-target-dir-container, #rec-dir-container {
             position: absolute;
             bottom: -25px;
@@ -384,8 +389,15 @@
     </div>
 
     <div id="overlay">
-        <h1 style="font-size: 3.5rem; margin-bottom: 10px;">F-16 조종 연습 시뮬레이션</h1>
+        <h1 style="font-size: 3.5rem; margin-bottom: 10px;">전투기 조종 연습 시뮬레이션</h1>
         <p style="opacity: 0.8;">저고도 초고속 비행은 기체 파손의 원인이 됩니다.</p>
+
+        <!-- 기체 선택 UI 추가 -->
+        <div id="jet-selection" style="display: flex; gap: 20px; margin-top: 20px;">
+            <div class="jet-card selected" onclick="selectJet('F-16')" id="card-f16">F-16 파이팅 팰콘</div>
+            <div class="jet-card" onclick="selectJet('F-15')" id="card-f15">F-15 이글</div>
+        </div>
+
         <div class="menu-btns" id="main-menu">
             <button id="start-btn" onclick="startGame()">시작하기</button>
             <button onclick="toggleSettings(true)">설정</button>
@@ -485,6 +497,112 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
+        // --- 웹 오디오 API를 활용한 절차적 사운드 생성 시스템 ---
+        let audioCtx;
+        const Sound = {
+            initialized: false,
+            init: function() {
+                if(this.initialized) return;
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new window.AudioContext();
+                
+                // 기본 엔진 소음(백색 잡음) 버퍼 생성
+                const bufferSize = audioCtx.sampleRate * 2;
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+                
+                this.engineNoiseBuffer = noiseBuffer;
+                
+                // 지속 엔진음 처리 노드
+                this.engineNoise = audioCtx.createBufferSource();
+                this.engineNoise.buffer = noiseBuffer;
+                this.engineNoise.loop = true;
+                this.engineFilter = audioCtx.createBiquadFilter();
+                this.engineFilter.type = 'lowpass';
+                this.engineGain = audioCtx.createGain();
+                this.engineGain.gain.value = 0;
+                this.engineNoise.connect(this.engineFilter);
+                this.engineFilter.connect(this.engineGain);
+                this.engineGain.connect(audioCtx.destination);
+                this.engineNoise.start();
+
+                // 레이더/락온 톤 노드
+                this.radarOsc = audioCtx.createOscillator();
+                this.radarOsc.type = 'square';
+                this.radarGain = audioCtx.createGain();
+                this.radarGain.gain.value = 0;
+                this.radarOsc.connect(this.radarGain);
+                this.radarGain.connect(audioCtx.destination);
+                this.radarOsc.start();
+                
+                this.initialized = true;
+            },
+            updateEngine: function(throttle) {
+                if(!this.initialized) return;
+                let vol = 0.05 + (throttle/100) * 0.15;
+                if(throttle > 100) vol += 0.2; 
+                this.engineGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.1);
+                this.engineFilter.frequency.setTargetAtTime(200 + throttle * 4, audioCtx.currentTime, 0.1);
+            },
+            playAB: function() { 
+                if(!this.initialized) return;
+            },
+            playLaunch: function() { 
+                if(!this.initialized) return;
+            },
+            playBoom: function() { 
+                if(!this.initialized) return;
+            },
+            playExplosion: function() { 
+                if(!this.initialized) return;
+            },
+            playGun: function() { // 기관포 소리 추가
+                if(!this.initialized) return;
+                const osc = audioCtx.createOscillator();
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = this.engineNoiseBuffer;
+                
+                const oscGain = audioCtx.createGain();
+                const noiseGain = audioCtx.createGain();
+                
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.05);
+                
+                oscGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                
+                noiseGain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                
+                osc.connect(oscGain);
+                noise.connect(noiseGain);
+                
+                oscGain.connect(audioCtx.destination);
+                noiseGain.connect(audioCtx.destination);
+                
+                osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+                noise.start(); noise.stop(audioCtx.currentTime + 0.05);
+            },
+            updateLock: function(active, locked) { // 레이더/락온 톤
+                if(!this.initialized) return;
+                if (locked) {
+                    this.radarGain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    this.radarOsc.frequency.setValueAtTime(1500, audioCtx.currentTime);
+                } else if (active) {
+                    if (Math.floor(performance.now() / 150) % 2 === 0) {
+                        this.radarGain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    } else {
+                        this.radarGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    }
+                    this.radarOsc.frequency.setValueAtTime(900, audioCtx.currentTime);
+                } else {
+                    this.radarGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                }
+            }
+        };
+
         // 레이더 및 ACM 스윕 변수
         let radarSweepTime = 0; 
         let radarSweepDir = 1;
@@ -553,7 +671,7 @@
         const INITIAL_FUEL_TIME = 42 * 60 + 16; 
         
         let flight = { 
-            speed: 700, throttle: 100, fuelTime: INITIAL_FUEL_TIME, fuelPct: 100,
+            speed: 700, throttle: 100, fuelTime: INITIAL_FUEL_TIME, fuelPct: 100, prevThrottle: 100,
             altitude: 200, roll: 0, pitch: 0, yaw: 0, autoBank: 0, 
             abIntensity: 0, boomTime: 0, wasSupersonic: false, explosionSize: 0,
             totalDist: 0, camDist: 38, reticleX: 0, reticleY: 0, freeCamYaw: 0, freeCamPitch: 0,
@@ -662,13 +780,19 @@
         }
 
         function startGame() {
+            Sound.init();
             document.getElementById('start-btn').innerText = "계속하기";
             document.getElementById('restart-btn').style.display = "block";
+            document.getElementById('jet-selection').style.display = "none";
             flight.unlimitedFuel = document.getElementById('unlimited-fuel').checked;
             flight.unlimitedAmmo = document.getElementById('unlimited-ammo').checked; 
             flight.unlimitedMissile = document.getElementById('unlimited-missile').checked; 
             if (flight.unlimitedMissile) {
-                weaponLoadout = [null, null, 'AIM-9X', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-9X', null, null];
+                if (selectedJetType === 'F-16') {
+                    weaponLoadout = [null, null, 'AIM-9X', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-9X', null, null];
+                } else {
+                    weaponLoadout = ['AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D'];
+                }
                 updateHUDMissile();
                 if (typeof mountedMissiles !== 'undefined') {
                     for (let idx in mountedMissiles) {
@@ -704,7 +828,7 @@
         const landGroup = new THREE.Group();
         const colliders = [];
         const mountainColliders = [];
-        const landSize = 50000;
+        const landSize = 100000;
         const landBase = new THREE.Mesh(new THREE.PlaneGeometry(landSize, landSize), new THREE.MeshLambertMaterial({ color: 0x335533 }));
         landBase.rotation.x = -Math.PI / 2;
         landBase.position.y = 0.5;
@@ -713,10 +837,10 @@
         function populateLand() {
             const treeGeo = new THREE.ConeGeometry(20, 60, 8);
             const treeMat = new THREE.MeshLambertMaterial({ color: 0x113311 });
-            const buildMat = new THREE.MeshLambertMaterial({ color: 0x777777 });
-            const roadMat = new THREE.MeshLambertMaterial({ color: 0x222222, polygonOffset: true, polygonOffsetFactor: -1.0, polygonOffsetUnits: -4.0 });
+            const hillMat = new THREE.MeshLambertMaterial({ color: 0x2b4a24 });
 
-            for(let i=0; i<100; i++) {
+            // 산은 조금씩 (50개)
+            for(let i=0; i<50; i++) {
                 const x = (Math.random() - 0.5) * landSize;
                 const z = (Math.random() - 0.5) * landSize;
                 const s = 300 + Math.random() * 800;
@@ -728,7 +852,31 @@
                 mountainColliders.push({ x, z, radius: s, height: h });
             }
 
-            const grassCount = 100000;
+            // 언덕진 맵 (언덕 많이 배치, 800개)
+            for(let i=0; i<800; i++) {
+                const x = (Math.random() - 0.5) * landSize;
+                const z = (Math.random() - 0.5) * landSize;
+                const s = 800 + Math.random() * 2000;
+                const h = 200 + Math.random() * 400;
+                const hill = new THREE.Mesh(new THREE.ConeGeometry(s, h, 8), hillMat);
+                hill.position.set(x, h/2, z);
+                landGroup.add(hill);
+                colliders.push({ x, z, radius: s * 0.7, height: h });
+                mountainColliders.push({ x, z, radius: s, height: h });
+            }
+
+            // 나무 듬성듬성 (1000개)
+            for(let i=0; i<1000; i++) {
+                const x = (Math.random() - 0.5) * landSize;
+                const z = (Math.random() - 0.5) * landSize;
+                const tree = new THREE.Mesh(treeGeo, treeMat);
+                tree.position.set(x, 30, z);
+                landGroup.add(tree);
+                colliders.push({ x, z, radius: 10, height: 60 });
+            }
+
+            // 잔디 듬성듬성 (기존 20만개에서 5만개로 축소)
+            const grassCount = 50000;
             const grassGeo = new THREE.ConeGeometry(4, 10, 3);
             const grassMat = new THREE.MeshLambertMaterial({ color: 0x2d5a27 });
             const instancedGrass = new THREE.InstancedMesh(grassGeo, grassMat, grassCount);
@@ -737,7 +885,6 @@
             for(let i=0; i<grassCount; i++) {
                 const x = (Math.random() - 0.5) * landSize;
                 const z = (Math.random() - 0.5) * landSize;
-                if (Math.abs(x) < 120 || Math.abs(z) < 120) { i--; continue; }
 
                 let isInsideMountain = false;
                 for (let mt of mountainColliders) {
@@ -752,10 +899,6 @@
                 instancedGrass.setMatrixAt(i, dummy.matrix);
             }
             landGroup.add(instancedGrass);
-
-            const rd1 = new THREE.Mesh(new THREE.PlaneGeometry(200, landSize), roadMat);
-            rd1.rotation.x = -Math.PI/2; rd1.position.y = 2.0; landGroup.add(rd1);
-            const rd2 = rd1.clone(); rd2.rotation.z = Math.PI/2; landGroup.add(rd2);
         }
         populateLand();
         scene.add(landGroup);
@@ -765,66 +908,156 @@
         const paintMat = new THREE.MeshStandardMaterial({ color: 0x7c8792 });
         const darkMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
 
+        // --- F-16 모델 구성 ---
+        const f16Model = new THREE.Group();
+        jetGroup.add(f16Model);
+
         const fuselage = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 13.6), paintMat);
         fuselage.position.z = 0.45;
-        jetGroup.add(fuselage);
+        f16Model.add(fuselage);
 
         const nose = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3.5, 32), paintMat);
         nose.rotation.x = -Math.PI / 2 - 0.15;
         nose.position.set(0, -0.3, -8.4);
-        jetGroup.add(nose);
+        f16Model.add(nose);
 
         const canopy = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshStandardMaterial({ color: 0x112233, transparent: true, opacity: 0.5 }));
         canopy.scale.set(1.0, 1.3, 1.8);
         canopy.position.set(0, 1.0, -4.1);
-        jetGroup.add(canopy);
+        f16Model.add(canopy);
 
+        // F-16 주익 형상 (20% 축소 및 델타익 스타일 적용, 위치 비율 보정)
         const wingShape = new THREE.Shape();
-        wingShape.moveTo(0, 0); wingShape.lineTo(6.5, 6.5); wingShape.lineTo(0, 6.5);
+        wingShape.moveTo(0, 0); 
+        wingShape.lineTo(5.2, 4.0); 
+        wingShape.lineTo(5.2, 5.2); 
+        wingShape.lineTo(0, 5.2);
         const wingGeo = new THREE.ExtrudeGeometry(wingShape, { depth: 0.2, bevelEnabled: false });
         const wingR = new THREE.Mesh(wingGeo, paintMat);
         wingR.rotation.x = Math.PI/2;
-        wingR.position.set(1.2, -0.2, -2.5); 
-        jetGroup.add(wingR);
+        wingR.position.set(1.2, -0.2, -1.2); 
+        f16Model.add(wingR);
         const wingL = wingR.clone(); wingL.scale.x = -1; wingL.position.x = -1.2;
-        jetGroup.add(wingL);
+        f16Model.add(wingL);
 
-        const pylonR = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.28, 2.66), darkMat);
-        pylonR.position.set(7.7, -0.2, 3.1);
-        jetGroup.add(pylonR);
-        const pylonL = pylonR.clone(); pylonL.position.x = -7.7;
-        jetGroup.add(pylonL);
+        // 주익과 동체를 자연스럽게 연결하는 블렌디드 윙 바디(스트레이크) 구현
+        const strakeShape = new THREE.Shape();
+        strakeShape.moveTo(0, 0); 
+        strakeShape.lineTo(1.2, 3.5); 
+        strakeShape.lineTo(0, 3.5);
+        const strakeGeo = new THREE.ExtrudeGeometry(strakeShape, { depth: 0.1, bevelEnabled: false });
+        const strakeR = new THREE.Mesh(strakeGeo, paintMat);
+        strakeR.rotation.x = Math.PI/2;
+        strakeR.position.set(1.2, -0.2, -2.7); 
+        f16Model.add(strakeR);
+        const strakeL = strakeR.clone(); strakeL.scale.x = -1; strakeL.position.x = -1.2;
+        f16Model.add(strakeL);
 
-        const pylonInR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 3.5), darkMat);
-        pylonInR.position.set(4.4, -0.6, 0.5); 
-        jetGroup.add(pylonInR);
-        const pylonInL = pylonInR.clone(); pylonInL.position.x = -4.4; 
-        jetGroup.add(pylonInL);
-        
-        const pylonOutR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 3.0), darkMat);
-        pylonOutR.position.set(6.0, -0.55, 1.5); 
-        jetGroup.add(pylonOutR);
-        const pylonOutL = pylonOutR.clone(); pylonOutL.position.x = -6.0; 
-        jetGroup.add(pylonOutL);
-
-        const hStabShape = new THREE.Shape(); hStabShape.moveTo(0,0); hStabShape.lineTo(3.5, 3.5); hStabShape.lineTo(0, 3.5);
+        // 수평미익: 주익이랑 동일한 델타익 형상 (크기는 수평미익에 맞게 축소)
+        const hStabShape = new THREE.Shape();
+        hStabShape.moveTo(0, 0); 
+        hStabShape.lineTo(2.496, 1.92); 
+        hStabShape.lineTo(2.496, 2.496); 
+        hStabShape.lineTo(0, 2.496);
         const hStabR = new THREE.Mesh(new THREE.ExtrudeGeometry(hStabShape, { depth: 0.1, bevelEnabled: false }), paintMat);
         hStabR.rotation.x = Math.PI/2;
         hStabR.position.set(1.2, 0, 5.3); 
-        jetGroup.add(hStabR);
+        f16Model.add(hStabR);
         const hStabL = hStabR.clone(); hStabL.scale.x = -1; hStabL.position.x = -1.2;
-        jetGroup.add(hStabL);
+        f16Model.add(hStabL);
 
+        // 수직미익: 직각삼각형 형상
         const vStabShape = new THREE.Shape();
-        vStabShape.moveTo(0, 0);               
-        vStabShape.lineTo(4.5, 0);             
-        vStabShape.lineTo(4.5, 3.8);           
-        vStabShape.lineTo(3.8, 3.8);           
+        vStabShape.moveTo(0, 0); 
+        vStabShape.lineTo(3.5, 0); 
+        vStabShape.lineTo(3.5, 3.5);
+        vStabShape.lineTo(0, 0);
         const vStab = new THREE.Mesh(new THREE.ExtrudeGeometry(vStabShape, { depth: 0.25, bevelEnabled: false }), paintMat);
         vStab.rotation.y = -Math.PI/2;
         vStab.position.set(0, 0.9, 5.0); 
-        jetGroup.add(vStab);
+        f16Model.add(vStab);
 
+        // F-16 공기흡입구 (크기 30% 증가, 엔진 노즐까지 연결)
+        const f16Intake = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 10.75, 16).rotateX(Math.PI/2), paintMat);
+        f16Intake.scale.set(1.56, 0.65, 1.0);
+        f16Intake.position.set(0, -1.0, 0.925);
+        f16Model.add(f16Intake);
+
+        // 동체 뒤쪽 짙은 회색 엔진 노즐
+        const engineNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.5, 16), darkMat);
+        engineNozzle.rotation.x = Math.PI / 2;
+        engineNozzle.position.set(0, -0.1, 7.8);
+        f16Model.add(engineNozzle);
+
+        // --- F-15 모델 구성 ---
+        const f15Model = new THREE.Group();
+        f15Model.visible = false;
+        jetGroup.add(f15Model);
+
+        const f15Fuselage = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.6, 14.5), paintMat);
+        f15Fuselage.position.z = 0.5;
+        f15Model.add(f15Fuselage);
+
+        const f15IntakeR = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 4.0), darkMat);
+        f15IntakeR.position.set(2.0, 0.0, -3.0);
+        f15Model.add(f15IntakeR);
+        const f15IntakeL = f15IntakeR.clone(); f15IntakeL.position.x = -2.0;
+        f15Model.add(f15IntakeL);
+
+        const f15Nose = new THREE.Mesh(new THREE.ConeGeometry(1.4, 4.5, 32), paintMat);
+        f15Nose.rotation.x = -Math.PI / 2 - 0.05;
+        f15Nose.position.set(0, 0.0, -8.8);
+        f15Model.add(f15Nose);
+
+        const f15Canopy = canopy.clone();
+        f15Canopy.scale.set(1.2, 1.5, 2.5);
+        f15Canopy.position.set(0, 1.2, -4.5);
+        f15Model.add(f15Canopy);
+
+        const f15WingShape = new THREE.Shape();
+        f15WingShape.moveTo(0, 0); f15WingShape.lineTo(6.5, 5.0); f15WingShape.lineTo(6.5, 6.5); f15WingShape.lineTo(0, 6.5);
+        const f15WingGeo = new THREE.ExtrudeGeometry(f15WingShape, { depth: 0.2, bevelEnabled: false });
+        const f15WingR = new THREE.Mesh(f15WingGeo, paintMat);
+        f15WingR.rotation.x = Math.PI/2;
+        f15WingR.position.set(1.6, -0.2, -2.5); 
+        f15Model.add(f15WingR);
+        const f15WingL = f15WingR.clone(); f15WingL.scale.x = -1; f15WingL.position.x = -1.6;
+        f15Model.add(f15WingL);
+
+        const f15HStabR = new THREE.Mesh(new THREE.ExtrudeGeometry(hStabShape, { depth: 0.1, bevelEnabled: false }), paintMat);
+        f15HStabR.rotation.x = Math.PI/2;
+        f15HStabR.position.set(1.6, 0, 5.5); 
+        f15Model.add(f15HStabR);
+        const f15HStabL = f15HStabR.clone(); f15HStabL.scale.x = -1; f15HStabL.position.x = -1.6;
+        f15Model.add(f15HStabL);
+
+        const f15VStabR = new THREE.Mesh(new THREE.ExtrudeGeometry(vStabShape, { depth: 0.25, bevelEnabled: false }), paintMat);
+        f15VStabR.rotation.y = -Math.PI/2;
+        f15VStabR.position.set(1.4, 0.8, 5.5);
+        f15Model.add(f15VStabR);
+        const f15VStabL = f15VStabR.clone(); f15VStabL.position.x = -1.4;
+        f15Model.add(f15VStabL);
+
+        // --- 공용 무장 파일런 (초기값은 축소된 F-16 비율에 맞춤, 기체 변경시 보정됨) ---
+        const pylonR = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.28, 3.192), darkMat);
+        pylonR.position.set(6.4, -0.2, 2.834);
+        jetGroup.add(pylonR);
+        const pylonL = pylonR.clone(); pylonL.position.x = -6.4;
+        jetGroup.add(pylonL);
+
+        const pylonInR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 3.5), darkMat);
+        pylonInR.position.set(3.76, -0.6, 1.2); 
+        jetGroup.add(pylonInR);
+        const pylonInL = pylonInR.clone(); pylonInL.position.x = -3.76; 
+        jetGroup.add(pylonInL);
+        
+        const pylonOutR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 3.0), darkMat);
+        pylonOutR.position.set(5.04, -0.55, 2.0); 
+        jetGroup.add(pylonOutR);
+        const pylonOutL = pylonOutR.clone(); pylonOutL.position.x = -5.04; 
+        jetGroup.add(pylonOutL);
+
+        // --- 레이더 시커 ---
         const seekerGroup = new THREE.Group();
         const outerGeo = new THREE.CircleGeometry(72, 64);
         const outerEdges = new THREE.EdgesGeometry(outerGeo);
@@ -851,41 +1084,133 @@
 
         jetGroup.scale.set(1.5, 1.5, 1.5);
 
+        // --- 에프터버너 구성 ---
         const abGroup = new THREE.Group();
+        
+        const abF16 = new THREE.Group();
         const abOuter = new THREE.Mesh(new THREE.ConeGeometry(0.75, 12, 16).translate(0, 6, 0).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({color: 0xff5500, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending}));
         const abInner = new THREE.Mesh(new THREE.ConeGeometry(0.5, 8, 16).translate(0, 4, 0).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({color: 0x44aaff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending}));
         const abCore = new THREE.Mesh(new THREE.ConeGeometry(0.25, 4, 16).translate(0, 2, 0).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending}));
-        abGroup.add(abOuter, abInner, abCore); 
-        abGroup.position.z = 8.1; 
+        abF16.add(abOuter, abInner, abCore); 
+        abGroup.add(abF16);
+        
+        const abF15 = new THREE.Group();
+        const abL = abF16.clone(); abL.position.x = -1.0;
+        const abR = abF16.clone(); abR.position.x = 1.0;
+        abF15.add(abL, abR);
+        abF15.visible = false;
+        abGroup.add(abF15);
+
+        abGroup.position.z = 8.55; 
         abGroup.visible = false; 
         jetGroup.add(abGroup);
 
-        const sonicBoom = new THREE.Mesh(new THREE.TorusGeometry(3, 0.05, 16, 100), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending }));
-        sonicBoom.rotation.x = Math.PI/2; sonicBoom.position.z = 2; jetGroup.add(sonicBoom);
-
-        const explosion = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0 }));
-        scene.add(explosion);
-
-        const missileStations = {
-            2: new THREE.Vector3(-7.9, -0.2, 3.1),
-            3: new THREE.Vector3(-6.0, -0.85, 1.5),
-            4: new THREE.Vector3(-4.4, -0.95, 0.5),
-            6: new THREE.Vector3(4.4, -0.95, 0.5),
-            7: new THREE.Vector3(6.0, -0.85, 1.5),
-            8: new THREE.Vector3(7.9, -0.2, 3.1)
+        // --- 무장 스테이션 좌표 및 기체 선택 로직 ---
+        const missileStationsF16 = {
+            2: new THREE.Vector3(-6.65, -0.2, 3.0),
+            3: new THREE.Vector3(-5.04, -0.85, 2.0),
+            4: new THREE.Vector3(-3.76, -0.95, 1.2),
+            6: new THREE.Vector3(3.76, -0.95, 1.2),
+            7: new THREE.Vector3(5.04, -0.85, 2.0),
+            8: new THREE.Vector3(6.65, -0.2, 3.0)
         };
+        const missileStationsF15 = {
+            0: new THREE.Vector3(-1.6, -0.5, -1.0),
+            1: new THREE.Vector3( 1.6, -0.5, -1.0),
+            2: new THREE.Vector3(-1.6, -0.5,  2.0),
+            3: new THREE.Vector3( 1.6, -0.5,  2.0),
+            4: new THREE.Vector3(-4.4, -1.2,  0.5),
+            6: new THREE.Vector3(-4.8, -0.9,  0.5),
+            7: new THREE.Vector3(-4.0, -0.9,  0.5),
+            8: new THREE.Vector3( 4.4, -1.2,  0.5),
+            9: new THREE.Vector3( 4.8, -0.9,  0.5),
+            10: new THREE.Vector3( 4.0, -0.9,  0.5)
+        };
+        
+        let missileStations = missileStationsF16;
         const mountedMissiles = {};
         for (let idx in missileStations) {
             let mType = weaponLoadout[idx];
             if (mType) {
                 let mMesh = missileGeo.clone();
                 if (mType === 'AIM-120D') mMesh.scale.set(1.2, 1.2, 1.5);
-                else mMesh.scale.set(0.9, 0.9, 0.9);
+                else mMesh.scale.set(1.17, 1.17, 1.17);
                 mMesh.position.copy(missileStations[idx]);
                 jetGroup.add(mMesh);
                 mountedMissiles[idx] = mMesh;
             }
         }
+
+        let selectedJetType = 'F-16';
+        function selectJet(type) {
+            if (!isPaused || isGameOver) return; 
+            selectedJetType = type;
+            document.getElementById('card-f16').classList.remove('selected');
+            document.getElementById('card-f15').classList.remove('selected');
+            
+            for (let idx in mountedMissiles) {
+                if (mountedMissiles[idx]) {
+                    jetGroup.remove(mountedMissiles[idx]);
+                }
+            }
+            for (let key in mountedMissiles) delete mountedMissiles[key];
+
+            if (type === 'F-16') {
+                document.getElementById('card-f16').classList.add('selected');
+                f16Model.visible = true;
+                f15Model.visible = false;
+                abF16.visible = true;
+                abF15.visible = false;
+                
+                // 파일런 좌표를 20% 축소된 F-16 델타익 비율로 복구
+                pylonR.visible = true;
+                pylonL.visible = true;
+                pylonR.position.set(6.4, -0.2, 2.834);
+                pylonL.position.set(-6.4, -0.2, 2.834);
+                pylonInR.position.set(3.76, -0.6, 1.2);
+                pylonInL.position.set(-3.76, -0.6, 1.2);
+                pylonOutR.position.set(5.04, -0.55, 2.0);
+                pylonOutL.position.set(-5.04, -0.55, 2.0);
+
+                weaponLoadout = [null, null, 'AIM-9X', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-9X', null, null];
+                currentWeaponType = 'AIM-9X';
+                missileStations = missileStationsF16;
+            } else {
+                document.getElementById('card-f15').classList.add('selected');
+                f16Model.visible = false;
+                f15Model.visible = true;
+                abF16.visible = false;
+                abF15.visible = true;
+                
+                // F-15 파일런 좌표를 기존 폭(6.5)에 맞춰 복원
+                pylonR.visible = false;
+                pylonL.visible = false;
+                pylonInR.position.set(4.4, -0.6, 0.5);
+                pylonInL.position.set(-4.4, -0.6, 0.5);
+                pylonOutR.position.set(6.0, -0.55, 1.5);
+                pylonOutL.position.set(-6.0, -0.55, 1.5);
+
+                weaponLoadout = ['AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', null, 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D', 'AIM-120D'];
+                currentWeaponType = 'AIM-120D';
+                missileStations = missileStationsF15;
+            }
+
+            for (let idx in missileStations) {
+                let mType = weaponLoadout[idx];
+                if (mType) {
+                    let mMesh = missileGeo.clone();
+                    if (mType === 'AIM-120D') mMesh.scale.set(1.2, 1.2, 1.5);
+                    else mMesh.scale.set(1.17, 1.17, 1.17);
+                    mMesh.position.copy(missileStations[idx]);
+                    jetGroup.add(mMesh);
+                    mountedMissiles[idx] = mMesh;
+                }
+            }
+            updateHUDMissile();
+        }
+
+        const explosion = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0 }));
+        scene.add(explosion);
 
         function spawnEnemies() {
             const enemyMat = new THREE.MeshStandardMaterial({ color: 0x773333, roughness: 0.5, metalness: 0.4 });
@@ -972,7 +1297,7 @@
 
             const m = missileGeo.clone();
             if (currentWeaponType === 'AIM-120D') m.scale.set(1.2, 1.2, 1.5);
-            else m.scale.set(0.9, 0.9, 0.9);
+            else m.scale.set(1.17, 1.17, 1.17);
             
             const offset = launchPosLocal.applyQuaternion(jetGroup.quaternion);
             m.position.copy(jetGroup.position).add(offset);
@@ -988,11 +1313,18 @@
                 if (dist > 40000) activeR = false; 
             }
 
+            let initialMissileSpeed = flight.speed / 3.6;
+            if (currentWeaponType === 'AIM-120D') {
+                initialMissileSpeed = 1361;
+            } else {
+                initialMissileSpeed = 850.7;
+            }
+
             missiles.push({
                 mesh: m,
                 target: flight.lockedTarget,
-                velocity: initialDir.clone().multiplyScalar(flight.speed / 3.6),
-                speed: flight.speed / 3.6,
+                velocity: initialDir.clone().multiplyScalar(initialMissileSpeed),
+                speed: initialMissileSpeed,
                 lifeTime: 0,
                 active: true,
                 prevDist: undefined,
@@ -1005,6 +1337,7 @@
             });
 
             flight.latestMissile = missiles[missiles.length - 1];
+            
         }
 
         document.addEventListener('pointerlockchange', () => { 
@@ -1191,7 +1524,32 @@
             }
         });
 
+        function checkLOS(pos1, pos2) {
+            const p1x = pos1.x - landGroup.position.x;
+            const p1z = pos1.z - landGroup.position.z;
+            const p1y = pos1.y;
+            const p2x = pos2.x - landGroup.position.x;
+            const p2z = pos2.z - landGroup.position.z;
+            const p2y = pos2.y;
+            const dx = p2x - p1x; const dz = p2z - p1z; const dy = p2y - p1y;
+            const length2 = dx*dx + dz*dz;
+            if (length2 === 0) return true;
+            for (let mt of mountainColliders) {
+                let t = ((mt.x - p1x) * dx + (mt.z - p1z) * dz) / length2;
+                t = Math.max(0, Math.min(1, t));
+                const cx = p1x + t * dx; const cz = p1z + t * dz;
+                const distSq = (cx - mt.x)**2 + (cz - mt.z)**2;
+                if (distSq < mt.radius * mt.radius) {
+                    const cy = p1y + t * dy;
+                    const coneHeight = mt.height * (1 - Math.sqrt(distSq) / mt.radius);
+                    if (cy < coneHeight) return false;
+                }
+            }
+            return true;
+        }
+
         function triggerGameOver() { 
+            if(!isGameOver) Sound.playExplosion();
             isGameOver = true; 
             explosion.position.copy(jetGroup.position); 
             explosion.material.opacity = 1; 
@@ -1231,13 +1589,23 @@
                 flight.throttle = Math.max(0, flight.throttle - tChg * 2); 
             }
 
+            if (!flight.prevThrottle) flight.prevThrottle = 100;
+            flight.prevThrottle = flight.throttle;
+
+            Sound.updateEngine(flight.throttle);
+
             const mach1 = 1225; 
             const currentMach = (flight.speed / 1225);
-            let tSpd = ((flight.throttle > 100 ? mach1*2.05 : (flight.throttle/100)*mach1*1.1) * flight.speedMult) - Math.sin(flight.pitch) * 1100;
-            let acc = ((flight.throttle > 100 ? (flight.speed < mach1 ? mach1/40 : (mach1*2.05-mach1)/80) : (mach1*1.1)/90) * flight.accMult);
+            
+            // F-15 최고속도 마하 2.5 적용 로직
+            const topMach = (selectedJetType === 'F-15') ? 2.55 : 2.05;
+            const overSpeedLimit = (selectedJetType === 'F-15') ? 2.5 : 2.0;
+
+            let tSpd = ((flight.throttle > 100 ? mach1*topMach : (flight.throttle/100)*mach1*1.1) * flight.speedMult) - Math.sin(flight.pitch) * 1100;
+            let acc = ((flight.throttle > 100 ? (flight.speed < mach1 ? mach1/40 : (mach1*topMach-mach1)/80) : (mach1*1.1)/90) * flight.accMult);
             if (flight.speed < tSpd) flight.speed = Math.min(flight.speed + acc * dt, tSpd); else flight.speed = Math.max(flight.speed - 180 * dt, tSpd);
 
-            const isOverspeed = (flight.altitude < 1000 && currentMach > 2.0);
+            const isOverspeed = (flight.altitude < 1000 && currentMach > overSpeedLimit);
             if (isOverspeed) {
                 flight.overspeedTimer += dt;
                 warningMsg.style.display = 'block';
@@ -1263,6 +1631,7 @@
                     
                     let maneuverStrength = Math.min(Math.abs(normX) * 3.0, 1.0); 
                     let recoverySpeed = 0.64 + maneuverStrength * 5.76; 
+                    if (selectedJetType === 'F-15') recoverySpeed *= 0.8; // ADDED
                     
                     flight.roll += diff * recoverySpeed * dt; 
                 }
@@ -1309,9 +1678,11 @@
                 if (distToEnemy <= 10000) {
                     const screenPos = enemyWorldPos.clone().project(camera);
                     if (screenPos.z < 1.0 && screenPos.z > -1.0) {
-                        const pixelX = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-                        const pixelY = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-                        labelCandidates.push({ enemy, dist: distToEnemy, pixelX, pixelY });
+                        if (checkLOS(jetWorldPos, enemyWorldPos)) {
+                            const pixelX = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                            const pixelY = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+                            labelCandidates.push({ enemy, dist: distToEnemy, pixelX, pixelY });
+                        }
                     } else { enemy.label.style.display = 'none'; }
                 } else { enemy.label.style.display = 'none'; }
                 if (jetWorldPos.distanceTo(enemyWorldPos) < 15) { triggerGameOver(); }
@@ -1336,6 +1707,7 @@
             if (isLeftMBDown && now - lastFireTime > 10 && (flight.ammo > 0 || flight.unlimitedAmmo) && !isAltHeld) { 
                 lastFireTime = now;
                 if (!flight.unlimitedAmmo) flight.ammo--; 
+                Sound.playGun();
                 const bullet = new THREE.Mesh(bulletGeo, bulletMat);
                 const noseOffset = new THREE.Vector3(0, -1.5, -9).applyQuaternion(moveQuat);
                 bullet.position.copy(jetGroup.position).add(noseOffset);
@@ -1444,26 +1816,42 @@
                     }
                     
                     if (m.target) {
-                        const dirToTarget = targetWorldPos.clone().sub(m.mesh.position).normalize();
+                        let aimTargetPos = targetWorldPos.clone();
+                        const enemyVel = new THREE.Vector3(0, 0, -m.target.speed).applyQuaternion(m.target.mesh.quaternion);
                         
-                        const targetForward = new THREE.Vector3(0, 0, -1).applyQuaternion(m.target.mesh.quaternion).normalize();
-                        const toMissile = m.mesh.position.clone().sub(targetWorldPos).normalize();
-                        const aspect = targetForward.dot(toMissile);
-                        const heatSig = Math.max(0.2, (aspect + 1) / 2); 
-
-                        const angle = currentDir.angleTo(dirToTarget);
-                        if (angle > 1.047) { 
-                            m.target = null; 
+                        if (distToTarget <= 10000) {
+                            const timeToIntercept = distToTarget / Math.max(1, m.speed);
+                            aimTargetPos.add(enemyVel.multiplyScalar(timeToIntercept));
                         } else {
-                            let maxAcc = 3500 * heatSig; 
-                            if (m.type === 'AIM-120D') maxAcc = 7000 * heatSig; 
-                            const maxTurnRate = maxAcc / Math.max(10, m.speed);
-                            const maxAngle = maxTurnRate * dt;
-                            if (angle > maxAngle) {
-                                const axis = new THREE.Vector3().crossVectors(currentDir, dirToTarget).normalize();
-                                currentDir.applyAxisAngle(axis, maxAngle);
+                            let loftHeight = (distToTarget - 10000) * 0.2;
+                            aimTargetPos.y += Math.min(loftHeight, 8000);
+                        }
+
+                        const dirToTarget = aimTargetPos.sub(m.mesh.position).normalize();
+                        
+                        if (!checkLOS(m.mesh.position, targetWorldPos)) {
+                            m.target = null;
+                        } else {
+                            const targetForward = new THREE.Vector3(0, 0, -1).applyQuaternion(m.target.mesh.quaternion).normalize();
+                            const toMissile = m.mesh.position.clone().sub(targetWorldPos).normalize();
+                            const aspect = targetForward.dot(toMissile);
+                            const heatSig = Math.max(0.2, (aspect + 1) / 2); 
+
+                            const angle = currentDir.angleTo(dirToTarget);
+                            if (angle > 1.047) { 
+                                m.target = null; 
                             } else {
-                                currentDir.copy(dirToTarget);
+                                let maxAcc = 3500 * heatSig; 
+                                if (m.type === 'AIM-120D') maxAcc = 7000 * heatSig; 
+                                if (distToTarget <= 5000) maxAcc *= 1.3; // 5km 이내 기동각 30% 증가
+                                const maxTurnRate = maxAcc / Math.max(10, m.speed);
+                                const maxAngle = maxTurnRate * dt;
+                                if (angle > maxAngle) {
+                                    const axis = new THREE.Vector3().crossVectors(currentDir, dirToTarget).normalize();
+                                    currentDir.applyAxisAngle(axis, maxAngle);
+                                } else {
+                                    currentDir.copy(dirToTarget);
+                                }
                             }
                         }
                     }
@@ -1479,7 +1867,7 @@
                     m.velocity.copy(currentDir).multiplyScalar(m.speed);
                 }
 
-                m.mesh.lookAt(m.mesh.position.clone().add(m.velocity.clone().normalize()));
+                m.mesh.lookAt(m.mesh.position.clone().sub(m.velocity.clone().normalize()));
                 m.mesh.position.addScaledVector(m.velocity, dt);
 
                 let hitTerrain = false;
@@ -1572,6 +1960,8 @@
             else if (currentMach < 0.98) { flight.wasSupersonic = false; }
             if (flight.boomTime > 0) { flight.boomTime -= dt * 1.5; sonicBoom.scale.set(1 + (1 - flight.boomTime) * 15, 1 + (1 - flight.boomTime) * 15, 1); sonicBoom.material.opacity = flight.boomTime * 0.6; }
 
+            Sound.updateLock(flight.seekerActive, flight.isLocked);
+
             if (flight.seekerActive) {
                 seekerGroup.visible = true;
                 seekerGroup.position.copy(new THREE.Vector3(0, -5.4, -100).applyAxisAngle(new THREE.Vector3(0, 0, 1), flight.roll));
@@ -1628,10 +2018,12 @@
                                     const ePX = screenPos.x * (window.innerWidth / 2), ePY = screenPos.y * (window.innerHeight / 2);
                                     const lockThreshold = 30; 
                                     if (Math.sqrt((ePX - sPX)**2 + (ePY - sPY)**2) <= lockThreshold) { 
-                                        isLocked = true; 
-                                        currentTarget = enemy; 
-                                        trackingTarget = enemy;
-                                        break; 
+                                        if (checkLOS(jetWorldPos, enemyWorldPos)) {
+                                            isLocked = true; 
+                                            currentTarget = enemy; 
+                                            trackingTarget = enemy;
+                                            break; 
+                                        }
                                     }
                                 }
                             }
@@ -1721,6 +2113,7 @@
             if(!flight.unlimitedFuel && flight.fuelPct < 20) document.getElementById('fuel-row').classList.add('fuel-low'); else document.getElementById('fuel-row').classList.remove('fuel-low');
             
             let turnFactor = 3.0 * dt * (700 / Math.max(700, flight.speed)); 
+            if (selectedJetType === 'F-15') turnFactor *= 0.8; // ADDED
             
             let normXForTurn = flight.reticleX / (window.innerWidth / 2);
             let normYForTurn = flight.reticleY / (window.innerHeight / 2);
@@ -1858,7 +2251,9 @@
                             if (Math.abs(radarSweepTime - radarX) < 0.05) isSwept = true;
 
                             if (isSwept) {
-                                enemy.radarMemory = { x: radarX, y: radarY, time: now };
+                                if (checkLOS(jetWorldPos, enemyWorldPos)) {
+                                    enemy.radarMemory = { x: radarX, y: radarY, time: now };
+                                }
                             }
                         }
                     }
@@ -1947,7 +2342,7 @@
                 const elevationAngle = Math.atan2(localPos.y, -localPos.z);
                 const maxRadarAngle = THREE.MathUtils.degToRad(70);
                 
-                if (dist > currentRadarRange || Math.abs(azimuthAngle) > maxRadarAngle || Math.abs(elevationAngle) > maxRadarAngle || localPos.z >= 0) {
+                if (dist > currentRadarRange || Math.abs(azimuthAngle) > maxRadarAngle || Math.abs(elevationAngle) > maxRadarAngle || localPos.z >= 0 || !checkLOS(jetWorldPos, targetWorldPos)) {
                     flight.radarTarget = null;
                     flight.seekerActive = false; 
                 }
@@ -2114,19 +2509,19 @@
                                 const boxSize = 48 / 2; 
                                 
                                 if (Math.abs(pixelX - acmPixelX) < boxSize && Math.abs(pixelY - acmPixelY) < boxSize) {
-                                    flight.radarTarget = enemy; 
-                                    isAcmMode = false; 
-                                    const targetBox = document.getElementById('radar-target-box');
-                                    targetBox.style.animation = 'none';
-                                    void targetBox.offsetWidth;
-                                    targetBox.style.animation = 'lockEngage 0.15s ease-out forwards';
-                                    break;
+                                    if (checkLOS(jetWorldPos, enemyWorldPos)) {
+                                        flight.radarTarget = enemy; 
+                                        isAcmMode = false; 
+                                        const targetBox = document.getElementById('radar-target-box');
+                                        targetBox.style.animation = 'none';
+                                        void targetBox.offsetWidth;
+                                        targetBox.style.animation = 'lockEngage 0.15s ease-out forwards';
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
-                } else {
-                    isAcmMode = false;
                 }
             } else {
                 acmBoxEl.style.display = 'none';
